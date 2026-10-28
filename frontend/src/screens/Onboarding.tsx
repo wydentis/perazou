@@ -11,7 +11,6 @@ export default function Onboarding({ me, initialCode, onDone }: { me: Me; initia
   const [groupName, setGroupName] = useState<string | null>(null);
   const [fullName, setFullName] = useState('');
   const [name, setName] = useState('');
-  const [week, setWeek] = useState<'odd' | 'even'>('odd');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Moscow';
@@ -27,7 +26,7 @@ export default function Onboarding({ me, initialCode, onDone }: { me: Me; initia
     setErr('');
     try {
       if (mode === 'join') await api.join({ code, full_name: fullName });
-      else await api.createGroup({ name, full_name: fullName, timezone: tz, current_week: week });
+      else await api.createGroup({ name, full_name: fullName, timezone: tz });
       haptic.ok();
       onDone();
     } catch (e) {
@@ -76,12 +75,6 @@ export default function Onboarding({ me, initialCode, onDone }: { me: Me; initia
             <>
               <Field label="Название группы">
                 <input value={name} onChange={(e) => setName(e.target.value)} maxLength={64} placeholder="ИВТ-21" />
-              </Field>
-              <Field label="Сейчас идёт неделя">
-                <div className="segmented">
-                  <button className={week === 'odd' ? 'active' : ''} onClick={() => setWeek('odd')}>Нечётная</button>
-                  <button className={week === 'even' ? 'active' : ''} onClick={() => setWeek('even')}>Чётная</button>
-                </div>
               </Field>
             </>
           )}

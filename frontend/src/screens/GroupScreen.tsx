@@ -12,7 +12,6 @@ export default function GroupScreen({ me, onChanged }: { me: Me; onChanged: () =
   const toast = useToast();
   const [d, setD] = useState<GroupDetails | null>(null);
   const [name, setName] = useState(me.group!.name);
-  const [week, setWeek] = useState(me.group!.current_week);
   const [myName, setMyName] = useState(me.member!.full_name);
   const load = useCallback(() => {
     api.group().then(setD, (e) => toast(humanError(e)));
@@ -124,15 +123,9 @@ export default function GroupScreen({ me, onChanged }: { me: Me; onChanged: () =
             <Field label="Название">
               <input value={name} onChange={(e) => setName(e.target.value)} maxLength={64} />
             </Field>
-            <Field label="Сейчас идёт неделя">
-              <div className="segmented">
-                <button className={week === 'odd' ? 'active' : ''} onClick={() => setWeek('odd')}>Нечётная</button>
-                <button className={week === 'even' ? 'active' : ''} onClick={() => setWeek('even')}>Чётная</button>
-              </div>
-            </Field>
             <p className="hint">Часовой пояс: {me.group!.timezone}</p>
           </div>
-          <button className="btn primary" onClick={run(() => api.updateGroup({ name, timezone: me.group!.timezone, current_week: week }), 'Сохранено', onChanged)}>
+          <button className="btn primary" onClick={run(() => api.updateGroup({ name, timezone: me.group!.timezone }), 'Сохранено', onChanged)}>
             Сохранить
           </button>
         </section>

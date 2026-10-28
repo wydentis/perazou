@@ -368,3 +368,4 @@ button.list-row:not(:disabled):active { background: var(--surface-2); }
 .import-cta { border-style: dashed; border-width: 1.5px; background: transparent; }
 input[type='date'] { min-height: 49px; }
 .file-btn.disabled { opacity: .35; }
+.auto-tag { margin-left: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--surface-2); padding: 2px 6px; border-radius: 6px; vertical-align: 2px; }

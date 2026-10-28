@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/xuri/excelize/v2"
@@ -111,8 +112,8 @@ func TestFinishLessonPatterns(t *testing.T) {
 	if ls := run("ОиМП с 26.10"); ls[0].ValidFrom != "2026-10-26" || ls[0].Subject != "ОиМП" {
 		t.Errorf("from: %+v", ls[0])
 	}
-	if ls := run("Физика нечетн.нед."); ls[0].Parity != 1 || ls[0].Subject != "Физика" {
-		t.Errorf("parity: %+v", ls[0])
+	if ls := run("Физика нечетн.нед."); ls[0].Subject != "Физика" || !strings.Contains(ls[0].Note, "еженедельная") {
+		t.Errorf("parity marker should be stripped and flagged: %+v", ls[0])
 	}
 	if ls := run("Физика 20.10"); ls[0].ValidFrom != "2026-10-20" || ls[0].ValidTo != "2026-10-20" { // 20.10.2026 is a Tuesday
 		t.Errorf("one-off: %+v", ls[0])

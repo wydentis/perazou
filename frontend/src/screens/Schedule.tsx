@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import type { Group, Slot } from '../types';
-import { PARITY, WEEKDAYS, rangeLabel } from '../util';
+import { WEEKDAYS, WEEKDAYS_SHORT, rangeLabel } from '../util';
 import ImportScreen from './Import';
 import { confirmDialog, haptic } from '../telegram';
 import { Icon } from '../icons';
 import { Empty, Skeleton, humanError, useToast } from '../ui';
 import { Field } from './Onboarding';
 
-const EMPTY: Omit<Slot, 'id'> = { weekday: 1, start_time: '09:00', end_time: '10:30', subject: '', room: '', teacher: '', parity: 0, valid_from: '', valid_to: '' };
-const PARITY_SHORT = ['', 'нечёт', 'чёт'];
+const EMPTY: Omit<Slot, 'id'> = { weekday: 1, start_time: '09:00', end_time: '10:30', subject: '', room: '', teacher: '', valid_from: '', valid_to: '' };
 
 export default function Schedule({ group, isHeadman }: { group: Group; isHeadman: boolean }) {
   const toast = useToast();
@@ -31,7 +30,7 @@ export default function Schedule({ group, isHeadman }: { group: Group; isHeadman
     <div className="page">
       <header className="top">
         <div>
-          <div className="eyebrow">Сейчас {group.current_week === 'odd' ? 'нечётная' : 'чётная'} неделя</div>
+          <div className="eyebrow">{group.name}</div>
           <h1 className="display">Расписание</h1>
         </div>
         {isHeadman && (
@@ -71,7 +70,6 @@ export default function Schedule({ group, isHeadman }: { group: Group; isHeadman
                   </div>
                   <div className="badges">
                     {(s.valid_from || s.valid_to) && <span className="badge violet">{rangeLabel(s.valid_from, s.valid_to)}</span>}
-                    {s.parity > 0 && <span className="badge pink">{PARITY_SHORT[s.parity]}</span>}
                   </div>
                   {isHeadman && <Icon name="right" size={16} className="chev" />}
                 </button>
@@ -122,7 +120,7 @@ function SlotForm({ initial, id, onClose }: { initial: Omit<Slot, 'id'>; id?: nu
         <Field label="День недели">
           <div className="weekday-picker">
             {WEEKDAYS.map((n, i) => (
-              <button key={n} className={s.weekday === i + 1 ? 'active' : ''} onClick={() => set('weekday', i + 1)}>{n.slice(0, 2)}</button>
+              <button key={n} className={s.weekday === i + 1 ? 'active' : ''} onClick={() => set('weekday', i + 1)}>{WEEKDAYS_SHORT[i]}</button>
             ))}
           </div>
         </Field>
@@ -135,15 +133,6 @@ function SlotForm({ initial, id, onClose }: { initial: Omit<Slot, 'id'>; id?: nu
         </Field>
         <Field label="Преподаватель">
           <input value={s.teacher} onChange={(e) => set('teacher', e.target.value)} maxLength={120} placeholder="Иванов И.И." />
-        </Field>
-        <Field label="Повторяется">
-          <div className="segmented">
-            {PARITY.map((n, i) => (
-              <button key={n} className={s.parity === i ? 'active' : ''} onClick={() => set('parity', i as 0 | 1 | 2)}>
-                {['Всегда', 'Нечёт', 'Чёт'][i]}
-              </button>
-            ))}
-          </div>
         </Field>
         <div className="row2">
           <Field label="Действует с"><input type="date" value={s.valid_from} onChange={(e) => set('valid_from', e.target.value)} /></Field>

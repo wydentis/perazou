@@ -12,7 +12,6 @@ type slot struct {
 	Subject   string `json:"subject"`
 	Room      string `json:"room"`
 	Teacher   string `json:"teacher"`
-	Parity    int    `json:"parity"`     // 0 every week, 1 odd, 2 even
 	ValidFrom string `json:"valid_from"` // YYYY-MM-DD or "" (no bound)
 	ValidTo   string `json:"valid_to"`
 }
@@ -26,37 +25,14 @@ func isoWeekday(t time.Time) int {
 	return int(t.Weekday())
 }
 
-func mondayOf(d time.Time) time.Time {
-	return d.AddDate(0, 0, -(isoWeekday(d) - 1))
-}
-
-// isOddWeek reports whether date falls in an odd week, given the Monday of an odd week.
-// All inputs are calendar dates (midnight UTC).
-func isOddWeek(week1Monday, date time.Time) bool {
-	days := int(mondayOf(date).Sub(week1Monday).Hours() / 24)
-	weeks := days / 7
-	if days < 0 && days%7 != 0 {
-		weeks--
-	}
-	return ((weeks%2)+2)%2 == 0
-}
-
-// occursOn reports whether a slot is scheduled on the given date.
-func (s slot) occursOn(week1Monday, date time.Time) bool {
+// occursOn reports whether a slot is scheduled on the given date (a calendar date, midnight UTC).
+func (s slot) occursOn(date time.Time) bool {
 	if s.Weekday != isoWeekday(date) {
 		return false
 	}
 	// Dates are compared as YYYY-MM-DD strings, which sort chronologically.
-	if d := date.Format(dateLayout); (s.ValidFrom != "" && d < s.ValidFrom) || (s.ValidTo != "" && d > s.ValidTo) {
-		return false
-	}
-	switch s.Parity {
-	case 1:
-		return isOddWeek(week1Monday, date)
-	case 2:
-		return !isOddWeek(week1Monday, date)
-	}
-	return true
+	d := date.Format(dateLayout)
+	return (s.ValidFrom == "" || d >= s.ValidFrom) && (s.ValidTo == "" || d <= s.ValidTo)
 }
 
 func parseDate(s string) (time.Time, error) {

@@ -20,7 +20,6 @@ type slotReq struct {
 	Subject   string `json:"subject"`
 	Room      string `json:"room"`
 	Teacher   string `json:"teacher"`
-	Parity    int    `json:"parity"`
 	ValidFrom string `json:"valid_from"`
 	ValidTo   string `json:"valid_to"`
 }
@@ -35,18 +34,18 @@ func validDateOrEmpty(s string) bool {
 
 func (r *slotReq) validate() bool {
 	r.Subject, r.Room, r.Teacher = cleanName(r.Subject, 100), cleanName(r.Room, 60), cleanName(r.Teacher, 120)
-	return r.Subject != "" && r.Weekday >= 1 && r.Weekday <= 7 && r.Parity >= 0 && r.Parity <= 2 &&
+	return r.Subject != "" && r.Weekday >= 1 && r.Weekday <= 7 &&
 		clockRe.MatchString(r.StartTime) && clockRe.MatchString(r.EndTime) && r.EndTime > r.StartTime &&
 		validDateOrEmpty(r.ValidFrom) && validDateOrEmpty(r.ValidTo) &&
 		(r.ValidFrom == "" || r.ValidTo == "" || r.ValidTo >= r.ValidFrom)
 }
 
-const slotCols = `id, weekday, to_char(start_time,'HH24:MI'), to_char(end_time,'HH24:MI'), subject, room, teacher, parity,
+const slotCols = `id, weekday, to_char(start_time,'HH24:MI'), to_char(end_time,'HH24:MI'), subject, room, teacher,
 	COALESCE(to_char(valid_from,'YYYY-MM-DD'),''), COALESCE(to_char(valid_to,'YYYY-MM-DD'),'')`
 
 func scanSlot(row pgx.Row) (slot, error) {
 	var s slot
-	err := row.Scan(&s.ID, &s.Weekday, &s.StartTime, &s.EndTime, &s.Subject, &s.Room, &s.Teacher, &s.Parity, &s.ValidFrom, &s.ValidTo)
+	err := row.Scan(&s.ID, &s.Weekday, &s.StartTime, &s.EndTime, &s.Subject, &s.Room, &s.Teacher, &s.ValidFrom, &s.ValidTo)
 	return s, err
 }
 
@@ -86,9 +85,9 @@ func (a *app) createSlot(c *gin.Context) {
 		return
 	}
 	s, err := scanSlot(a.db.QueryRow(c, `
-		INSERT INTO schedule_slots (group_id, weekday, start_time, end_time, subject, room, teacher, parity, valid_from, valid_to)
-		VALUES ($1,$2,$3::time,$4::time,$5,$6,$7,$8,NULLIF($9,'')::date,NULLIF($10,'')::date) RETURNING `+slotCols,
-		sess(c).Group.ID, req.Weekday, req.StartTime, req.EndTime, req.Subject, req.Room, req.Teacher, req.Parity, req.ValidFrom, req.ValidTo))
+		INSERT INTO schedule_slots (group_id, weekday, start_time, end_time, subject, room, teacher, valid_from, valid_to)
+		VALUES ($1,$2,$3::time,$4::time,$5,$6,$7,NULLIF($8,'')::date,NULLIF($9,'')::date) RETURNING `+slotCols,
+		sess(c).Group.ID, req.Weekday, req.StartTime, req.EndTime, req.Subject, req.Room, req.Teacher, req.ValidFrom, req.ValidTo))
 	if err != nil {
 		serverErr(c, err)
 		return
@@ -110,10 +109,10 @@ func (a *app) updateSlot(c *gin.Context) {
 		return
 	}
 	s, err := scanSlot(a.db.QueryRow(c, `
-		UPDATE schedule_slots SET weekday=$3, start_time=$4::time, end_time=$5::time, subject=$6, room=$7, teacher=$8, parity=$9,
-			valid_from=NULLIF($10,'')::date, valid_to=NULLIF($11,'')::date
+		UPDATE schedule_slots SET weekday=$3, start_time=$4::time, end_time=$5::time, subject=$6, room=$7, teacher=$8,
+			valid_from=NULLIF($9,'')::date, valid_to=NULLIF($10,'')::date
 		WHERE id=$1 AND group_id=$2 RETURNING `+slotCols,
-		id, sess(c).Group.ID, req.Weekday, req.StartTime, req.EndTime, req.Subject, req.Room, req.Teacher, req.Parity, req.ValidFrom, req.ValidTo))
+		id, sess(c).Group.ID, req.Weekday, req.StartTime, req.EndTime, req.Subject, req.Room, req.Teacher, req.ValidFrom, req.ValidTo))
 	if err == pgx.ErrNoRows {
 		fail(c, http.StatusNotFound, "slot not found")
 		return
@@ -151,7 +150,7 @@ func (a *app) findLesson(c *gin.Context, s *session, slotID int64, dateStr strin
 		return slot{}, date, false
 	}
 	sl, err := scanSlot(a.db.QueryRow(c, `SELECT `+slotCols+` FROM schedule_slots WHERE id=$1 AND group_id=$2`, slotID, s.Group.ID))
-	if err == pgx.ErrNoRows || (err == nil && !sl.occursOn(s.Group.Week1Monday, date)) {
+	if err == pgx.ErrNoRows || (err == nil && !sl.occursOn(date)) {
 		fail(c, http.StatusNotFound, "lesson not found")
 		return slot{}, date, false
 	} else if err != nil {
@@ -170,9 +169,18 @@ type lesson struct {
 	Open     bool   `json:"open"`
 	ClosesAt string `json:"closes_at"` // when student marking closes ("HH:MM")
 	MyState  string `json:"my_status"` // present | absent | "" (not marked)
+	MyAuto   bool   `json:"my_auto"`   // my "absent" was set automatically
 	Present  int    `json:"present"`
-	Absent   int    `json:"absent"`
-	Total    int    `json:"total"`
+	Absent   int    `json:"absent"` // includes AutoAbsent
+	// AutoAbsent counts members who did not mark themselves before the window closed.
+	AutoAbsent int `json:"auto_absent"`
+	Total      int `json:"total"`
+}
+
+// autoAbsent reports whether a missing mark counts as "absent": the student window has
+// closed on a lesson that took place. Nothing is written; an explicit mark always wins.
+func autoAbsent(started, open, cancelled bool) bool {
+	return started && !open && !cancelled
 }
 
 func (a *app) listLessons(c *gin.Context) {
@@ -193,8 +201,10 @@ func (a *app) listLessons(c *gin.Context) {
 	}
 	// Members who joined after this date were not expected at its lessons.
 	var total int
-	if err := a.db.QueryRow(c, `SELECT count(*) FROM members WHERE group_id=$1 AND (joined_at AT TIME ZONE $3)::date <= $2::date`,
-		s.Group.ID, dateStr, s.Group.Timezone).Scan(&total); err != nil {
+	var meExpected bool
+	if err := a.db.QueryRow(c, `SELECT count(*), COALESCE(bool_or(user_id=$4), false) FROM members
+		WHERE group_id=$1 AND (joined_at AT TIME ZONE $3)::date <= $2::date`,
+		s.Group.ID, dateStr, s.Group.Timezone, s.UserID).Scan(&total, &meExpected); err != nil {
 		serverErr(c, err)
 		return
 	}
@@ -264,7 +274,7 @@ func (a *app) listLessons(c *gin.Context) {
 	now := s.Group.now()
 	out := []lesson{}
 	for _, sl := range all {
-		if !sl.occursOn(s.Group.Week1Monday, date) {
+		if !sl.occursOn(date) {
 			continue
 		}
 		started, open := lessonState(now, date, sl.StartTime)
@@ -272,6 +282,13 @@ func (a *app) listLessons(c *gin.Context) {
 		l.Open = open && !l.Cancelled
 		if g := aggs[sl.ID]; g != nil {
 			l.Present, l.Absent, l.MyState = g.present, g.absent, g.mine
+		}
+		if autoAbsent(started, open, l.Cancelled) {
+			l.AutoAbsent = max(0, total-l.Present-l.Absent)
+			l.Absent += l.AutoAbsent
+			if l.MyState == "" && meExpected {
+				l.MyState, l.MyAuto = "absent", true
+			}
 		}
 		out = append(out, l)
 	}
@@ -285,14 +302,23 @@ func (a *app) lessonAttendance(c *gin.Context) {
 		fail(c, http.StatusBadRequest, "bad slot_id")
 		return
 	}
-	if _, _, ok := a.findLesson(c, s, slotID, c.Query("date")); !ok {
+	sl, date, ok := a.findLesson(c, s, slotID, c.Query("date"))
+	if !ok {
 		return
 	}
+	var isCancelled bool
+	if err := a.db.QueryRow(c, `SELECT EXISTS (SELECT 1 FROM lesson_cancellations WHERE slot_id=$1 AND lesson_date=$2::date)`,
+		slotID, c.Query("date")).Scan(&isCancelled); err != nil {
+		serverErr(c, err)
+		return
+	}
+	started, open := lessonState(s.Group.now(), date, sl.StartTime)
+	auto := autoAbsent(started, open, isCancelled)
 	rows, err := a.db.Query(c, `
-		SELECT m.user_id, m.full_name, COALESCE(a.status, '')
+		SELECT m.user_id, m.full_name, COALESCE(a.status, ''), (m.joined_at AT TIME ZONE $4)::date <= $3::date
 		FROM members m
 		LEFT JOIN attendance a ON a.user_id = m.user_id AND a.slot_id=$2 AND a.lesson_date=$3::date
-		WHERE m.group_id=$1 ORDER BY m.full_name`, s.Group.ID, slotID, c.Query("date"))
+		WHERE m.group_id=$1 ORDER BY m.full_name`, s.Group.ID, slotID, c.Query("date"), s.Group.Timezone)
 	if err != nil {
 		serverErr(c, err)
 		return
@@ -302,13 +328,18 @@ func (a *app) lessonAttendance(c *gin.Context) {
 		UserID   int64  `json:"user_id"`
 		FullName string `json:"full_name"`
 		Status   string `json:"status"`
+		Auto     bool   `json:"auto"`
 	}
 	out := []row{}
 	for rows.Next() {
 		var r row
-		if err := rows.Scan(&r.UserID, &r.FullName, &r.Status); err != nil {
+		var expected bool
+		if err := rows.Scan(&r.UserID, &r.FullName, &r.Status, &expected); err != nil {
 			serverErr(c, err)
 			return
+		}
+		if r.Status == "" && auto && expected {
+			r.Status, r.Auto = "absent", true
 		}
 		out = append(out, r)
 	}
@@ -472,19 +503,28 @@ func (a *app) stats(c *gin.Context) {
 
 	// One entry per lesson that took place, in date order; a member's total counts only
 	// the lessons since the day they joined.
+	// Lessons whose student window is still open are the only ones that can be unmarked;
+	// every other missing mark counts as an automatic "absent".
 	var lessonDates []string
+	openLessons := map[string]bool{} // slotID+date
+	var openDates []string
 	for d := from; !d.After(to); d = d.AddDate(0, 0, 1) {
 		for _, sl := range all {
-			if !sl.occursOn(s.Group.Week1Monday, d) || cancelled[strconv.FormatInt(sl.ID, 10)+d.Format(dateLayout)] {
+			key := strconv.FormatInt(sl.ID, 10) + d.Format(dateLayout)
+			if !sl.occursOn(d) || cancelled[key] {
 				continue
 			}
-			if started, _ := lessonState(now, d, sl.StartTime); started {
+			if started, open := lessonState(now, d, sl.StartTime); started {
 				lessonDates = append(lessonDates, d.Format(dateLayout))
+				if open {
+					openLessons[key] = true
+					openDates = append(openDates, d.Format(dateLayout))
+				}
 			}
 		}
 	}
-	lessonsSince := func(joined string) int {
-		return len(lessonDates) - sort.SearchStrings(lessonDates, joined)
+	since := func(dates []string, joined string) int {
+		return len(dates) - sort.SearchStrings(dates, joined)
 	}
 
 	// Marks can only exist for lessons that occurred, but a deleted-then-recreated schedule may
@@ -522,7 +562,7 @@ func (a *app) stats(c *gin.Context) {
 			i = len(out)
 			idx[uid] = i
 			joinedAt[uid] = joined
-			out = append(out, statRow{UserID: uid, FullName: name, Total: lessonsSince(joined)})
+			out = append(out, statRow{UserID: uid, FullName: name, Total: since(lessonDates, joined), Unmarked: since(openDates, joined)})
 		}
 		if slotID == nil || dateNullable == nil || *dateNullable < joinedAt[uid] {
 			continue
@@ -530,13 +570,14 @@ func (a *app) stats(c *gin.Context) {
 		dateStr = *dateNullable
 		d, _ := parseDate(dateStr)
 		sl, ok := slotByID[*slotID]
-		if !ok || !sl.occursOn(s.Group.Week1Monday, d) || cancelled[strconv.FormatInt(*slotID, 10)+dateStr] {
+		if !ok || !sl.occursOn(d) || cancelled[strconv.FormatInt(*slotID, 10)+dateStr] {
 			continue
 		}
 		if status == "present" {
 			out[i].Present++
-		} else if status == "absent" {
-			out[i].Absent++
+		}
+		if openLessons[strconv.FormatInt(*slotID, 10)+dateStr] {
+			out[i].Unmarked-- // marked while the window is still open
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -544,10 +585,8 @@ func (a *app) stats(c *gin.Context) {
 		return
 	}
 	for i := range out {
-		out[i].Unmarked = out[i].Total - out[i].Present - out[i].Absent
-		if out[i].Unmarked < 0 {
-			out[i].Unmarked = 0
-		}
+		out[i].Unmarked = max(0, out[i].Unmarked)
+		out[i].Absent = max(0, out[i].Total-out[i].Present-out[i].Unmarked)
 	}
 	c.JSON(http.StatusOK, gin.H{"from": from.Format(dateLayout), "to": to.Format(dateLayout), "lessons": len(lessonDates), "rows": out})
 }

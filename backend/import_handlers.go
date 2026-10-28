@@ -104,7 +104,7 @@ func (a *app) parseImport(c *gin.Context) {
 
 // applyImport inserts the previewed slots. With replace=true the current schedule (and,
 // through ON DELETE CASCADE, its attendance history) is removed first. A slot that already
-// exists (same day, time, subject, parity and period) only gets its room and teacher
+// exists (same day, time, subject and period) only gets its room and teacher
 // refreshed, so re-importing an updated timetable is harmless.
 func (a *app) applyImport(c *gin.Context) {
 	s := sess(c)
@@ -139,11 +139,11 @@ func (a *app) applyImport(c *gin.Context) {
 	}
 	created := 0
 	for _, r := range req.Slots {
-		args := []any{s.Group.ID, r.Weekday, r.StartTime, r.EndTime, r.Subject, r.Room, r.Teacher, r.Parity, r.ValidFrom, r.ValidTo}
+		args := []any{s.Group.ID, r.Weekday, r.StartTime, r.EndTime, r.Subject, r.Room, r.Teacher, r.ValidFrom, r.ValidTo}
 		tag, err := tx.Exec(c, `
 			UPDATE schedule_slots SET room=$6, teacher=$7
-			WHERE group_id=$1 AND weekday=$2 AND start_time=$3::time AND end_time=$4::time AND subject=$5 AND parity=$8
-				AND valid_from IS NOT DISTINCT FROM NULLIF($9,'')::date AND valid_to IS NOT DISTINCT FROM NULLIF($10,'')::date`, args...)
+			WHERE group_id=$1 AND weekday=$2 AND start_time=$3::time AND end_time=$4::time AND subject=$5
+				AND valid_from IS NOT DISTINCT FROM NULLIF($8,'')::date AND valid_to IS NOT DISTINCT FROM NULLIF($9,'')::date`, args...)
 		if err != nil {
 			serverErr(c, err)
 			return
@@ -152,8 +152,8 @@ func (a *app) applyImport(c *gin.Context) {
 			continue
 		}
 		if _, err := tx.Exec(c, `
-			INSERT INTO schedule_slots (group_id, weekday, start_time, end_time, subject, room, teacher, parity, valid_from, valid_to)
-			VALUES ($1,$2,$3::time,$4::time,$5,$6,$7,$8,NULLIF($9,'')::date,NULLIF($10,'')::date)`, args...); err != nil {
+			INSERT INTO schedule_slots (group_id, weekday, start_time, end_time, subject, room, teacher, valid_from, valid_to)
+			VALUES ($1,$2,$3::time,$4::time,$5,$6,$7,NULLIF($8,'')::date,NULLIF($9,'')::date)`, args...); err != nil {
 			serverErr(c, err)
 			return
 		}

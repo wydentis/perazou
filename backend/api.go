@@ -24,12 +24,9 @@ type app struct {
 }
 
 type groupInfo struct {
-	ID          int64  `json:"id"`
-	Name        string `json:"name"`
-	Timezone    string `json:"timezone"`
-	Week1Monday string `json:"week1_monday"`
-	// Parity of the current week ("odd"/"even"), handy for the settings form.
-	CurrentWeek string `json:"current_week"`
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Timezone string `json:"timezone"`
 }
 
 type memberInfo struct {
@@ -53,11 +50,10 @@ type session struct {
 }
 
 type groupRow struct {
-	ID          int64
-	Name        string
-	Code        string
-	Timezone    string
-	Week1Monday time.Time
+	ID       int64
+	Name     string
+	Code     string
+	Timezone string
 }
 
 func (g groupRow) loc() *time.Location {
@@ -76,11 +72,7 @@ func (g groupRow) now() time.Time {
 }
 
 func (g groupRow) info() groupInfo {
-	cur := "even"
-	if isOddWeek(g.Week1Monday, g.now()) {
-		cur = "odd"
-	}
-	return groupInfo{ID: g.ID, Name: g.Name, Timezone: g.Timezone, Week1Monday: g.Week1Monday.Format(dateLayout), CurrentWeek: cur}
+	return groupInfo{ID: g.ID, Name: g.Name, Timezone: g.Timezone}
 }
 
 func newRouter(a *app) *gin.Engine {
@@ -166,9 +158,9 @@ func (a *app) authMiddleware(c *gin.Context) {
 func (a *app) loadSession(ctx context.Context, userID int64) (*session, error) {
 	s := &session{UserID: userID}
 	err := a.db.QueryRow(ctx, `
-		SELECT m.full_name, m.role, g.id, g.name, g.invite_code, g.timezone, g.week1_monday
+		SELECT m.full_name, m.role, g.id, g.name, g.invite_code, g.timezone
 		FROM members m JOIN groups g ON g.id = m.group_id WHERE m.user_id = $1`, userID).
-		Scan(&s.FullName, &s.Role, &s.Group.ID, &s.Group.Name, &s.Group.Code, &s.Group.Timezone, &s.Group.Week1Monday)
+		Scan(&s.FullName, &s.Role, &s.Group.ID, &s.Group.Name, &s.Group.Code, &s.Group.Timezone)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -265,10 +257,9 @@ func (a *app) previewGroup(c *gin.Context) {
 func (a *app) createGroup(c *gin.Context) {
 	u := c.MustGet(keyUser).(*tgUser)
 	var req struct {
-		Name        string `json:"name"`
-		FullName    string `json:"full_name"`
-		Timezone    string `json:"timezone"`
-		CurrentWeek string `json:"current_week"` // odd | even
+		Name     string `json:"name"`
+		FullName string `json:"full_name"`
+		Timezone string `json:"timezone"`
 	}
 	if !bind(c, &req) {
 		return
@@ -281,12 +272,10 @@ func (a *app) createGroup(c *gin.Context) {
 	if req.Timezone == "" {
 		req.Timezone = "Europe/Moscow"
 	}
-	loc, err := time.LoadLocation(req.Timezone)
-	if err != nil || (req.CurrentWeek != "odd" && req.CurrentWeek != "even") {
-		fail(c, http.StatusBadRequest, "invalid timezone or current_week")
+	if _, err := time.LoadLocation(req.Timezone); err != nil {
+		fail(c, http.StatusBadRequest, "invalid timezone")
 		return
 	}
-	week1 := weekAnchor(loc, req.CurrentWeek == "odd")
 
 	tx, err := a.db.Begin(c)
 	if err != nil {
@@ -303,8 +292,8 @@ func (a *app) createGroup(c *gin.Context) {
 			return
 		}
 		// DO NOTHING on a code collision (no row returned) instead of failing the transaction.
-		err = tx.QueryRow(c, `INSERT INTO groups (name, invite_code, timezone, week1_monday) VALUES ($1,$2,$3,$4)
-			ON CONFLICT (invite_code) DO NOTHING RETURNING id`, req.Name, code, req.Timezone, week1).Scan(&gid)
+		err = tx.QueryRow(c, `INSERT INTO groups (name, invite_code, timezone) VALUES ($1,$2,$3)
+			ON CONFLICT (invite_code) DO NOTHING RETURNING id`, req.Name, code, req.Timezone).Scan(&gid)
 		if err == nil {
 			break
 		}
@@ -326,18 +315,6 @@ func (a *app) createGroup(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"group_id": gid})
-}
-
-// weekAnchor returns the Monday that should be stored as "week 1" so that the current
-// week has the requested parity.
-func weekAnchor(loc *time.Location, currentIsOdd bool) time.Time {
-	n := time.Now().In(loc)
-	today := time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC)
-	mon := mondayOf(today)
-	if !currentIsOdd {
-		mon = mon.AddDate(0, 0, -7)
-	}
-	return mon
 }
 
 func isUnique(err error) bool {
@@ -414,29 +391,19 @@ func (a *app) getGroup(c *gin.Context) {
 func (a *app) updateGroup(c *gin.Context) {
 	s := sess(c)
 	var req struct {
-		Name        string `json:"name"`
-		Timezone    string `json:"timezone"`
-		CurrentWeek string `json:"current_week"`
+		Name     string `json:"name"`
+		Timezone string `json:"timezone"`
 	}
 	if !bind(c, &req) {
 		return
 	}
 	req.Name = cleanName(req.Name, 64)
-	loc, err := time.LoadLocation(req.Timezone)
-	if req.Name == "" || err != nil || (req.CurrentWeek != "odd" && req.CurrentWeek != "even") {
-		fail(c, http.StatusBadRequest, "invalid name, timezone or current_week")
+	if _, err := time.LoadLocation(req.Timezone); req.Name == "" || err != nil {
+		fail(c, http.StatusBadRequest, "invalid name or timezone")
 		return
 	}
-	// Re-anchor only if the requested parity differs from the current one (evaluated in the
-	// new timezone); otherwise a stale form submitted across a week boundary would flip it.
-	anchor := s.Group.Week1Monday
-	moved := s.Group
-	moved.Timezone = req.Timezone
-	if isOddWeek(anchor, moved.now()) != (req.CurrentWeek == "odd") {
-		anchor = weekAnchor(loc, req.CurrentWeek == "odd")
-	}
-	if _, err := a.db.Exec(c, `UPDATE groups SET name=$2, timezone=$3, week1_monday=$4 WHERE id=$1`,
-		s.Group.ID, req.Name, req.Timezone, anchor); err != nil {
+	if _, err := a.db.Exec(c, `UPDATE groups SET name=$2, timezone=$3 WHERE id=$1`,
+		s.Group.ID, req.Name, req.Timezone); err != nil {
 		serverErr(c, err)
 		return
 	}

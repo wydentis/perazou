@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import type { AttendanceRow, Lesson, Me, Slot } from '../types';
-import { addDays, isOddWeek, mondayOf, nowMinutesIn, occursOn, parseDate, plural, todayIn, toMinutes, WEEKDAYS_SHORT } from '../util';
+import { addDays, mondayOf, nowMinutesIn, occursOn, parseDate, plural, todayIn, toMinutes, WEEKDAYS_SHORT } from '../util';
 import { haptic } from '../telegram';
 import { Icon } from '../icons';
 import { Avatar, Empty, Skeleton, humanError, useToast } from '../ui';
@@ -36,9 +36,9 @@ export default function Today({ me }: { me: Me }) {
     const mon = mondayOf(date);
     return Array.from({ length: 7 }, (_, i) => {
       const d = addDays(mon, i);
-      return { d, has: slots.some((s) => occursOn(s, group.week1_monday, d)) };
+      return { d, has: slots.some((s) => occursOn(s, d)) };
     });
-  }, [date, slots, group.week1_monday]);
+  }, [date, slots]);
 
   async function mark(l: Lesson, status: 'present' | 'absent') {
     const next = l.my_status === status ? 'none' : status;
@@ -71,14 +71,13 @@ export default function Today({ me }: { me: Me }) {
   }
 
   const d = parseDate(date);
-  const odd = isOddWeek(group.week1_monday, date);
   const nowMin = nowMinutesIn(group.timezone);
 
   return (
     <div className="page">
       <header className="top">
         <div>
-          <div className="eyebrow">{group.name} · {odd ? 'нечётная' : 'чётная'} неделя</div>
+          <div className="eyebrow">{group.name}</div>
           <h1 className="display">
             {d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
           </h1>
@@ -140,7 +139,9 @@ export default function Today({ me }: { me: Me }) {
                     <div className="split-bar"><i className="p" style={{ width: pPct + '%' }} /><i className="a" style={{ width: aPct + '%' }} /></div>
                     <div className="meta">
                       <span className="c-ok">{l.present} {plural(l.present, 'был', 'были', 'были')}</span>
-                      <span className="c-bad">{l.absent} не {plural(l.absent, 'был', 'были', 'были')}</span>
+                      <span className="c-bad">
+                        {l.absent} не {plural(l.absent, 'был', 'были', 'были')}{l.auto_absent > 0 && ` (${l.auto_absent} авто)`}
+                      </span>
                       <span>из {l.total}</span>
                     </div>
                   </>
@@ -180,6 +181,7 @@ function MarkHint({ l, today, isHeadman }: { l: Lesson; today: boolean; isHeadma
   let text: string;
   if (!l.started) text = `Отметка откроется в ${l.start_time} на 15 минут`;
   else if (l.open) text = `Отметиться можно до ${l.closes_at}`;
+  else if (l.my_auto) text = `Не отметились до ${l.closes_at} — автоматически «не был»`;
   else text = today ? `Отметка закрылась в ${l.closes_at}` : 'Отметка закрыта';
   if (isHeadman && l.started && !l.open) text += ' · исправить можно в «Списке»';
   return <div className={'mark-hint' + (l.open ? ' live' : '')}><Icon name="clock" size={14} /> {text}</div>;
@@ -196,7 +198,8 @@ function Roster({ lesson, onChange }: { lesson: Lesson; onChange: () => void }) 
   async function set(r: AttendanceRow, status: 'present' | 'absent') {
     haptic.tap();
     try {
-      await api.mark({ slot_id: lesson.id, date: lesson.date, user_id: r.user_id, status: r.status === status ? 'none' : status });
+      // Tapping "absent" on an automatic mark confirms it rather than clearing it.
+      await api.mark({ slot_id: lesson.id, date: lesson.date, user_id: r.user_id, status: r.status === status && !r.auto ? 'none' : status });
       load();
       onChange();
     } catch (e) {
@@ -221,7 +224,7 @@ function Roster({ lesson, onChange }: { lesson: Lesson; onChange: () => void }) 
       {rows.map((r) => (
         <div key={r.user_id} className="roster-row">
           <Avatar name={r.full_name} id={r.user_id} size={34} />
-          <span className="grow">{r.full_name}</span>
+          <span className="grow">{r.full_name}{r.auto && <span className="auto-tag">авто</span>}</span>
           <button className={'round yes' + (r.status === 'present' ? ' on' : '')} onClick={() => set(r, 'present')} aria-label="Был"><Icon name="check" size={16} /></button>
           <button className={'round no' + (r.status === 'absent' ? ' on' : '')} onClick={() => set(r, 'absent')} aria-label="Не был"><Icon name="x" size={16} /></button>
         </div>
