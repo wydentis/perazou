@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { Me } from '../types';
+import { Icon } from '../icons';
+import { haptic } from '../telegram';
+import { humanError } from '../ui';
 
 export default function Onboarding({ me, initialCode, onDone }: { me: Me; initialCode: string; onDone: () => void }) {
   const [mode, setMode] = useState<'join' | 'create'>(initialCode ? 'join' : 'create');
@@ -25,9 +28,11 @@ export default function Onboarding({ me, initialCode, onDone }: { me: Me; initia
     try {
       if (mode === 'join') await api.join({ code, full_name: fullName });
       else await api.createGroup({ name, full_name: fullName, timezone: tz, current_week: week });
+      haptic.ok();
       onDone();
     } catch (e) {
-      setErr((e as Error).message);
+      haptic.err();
+      setErr(humanError(e));
     } finally {
       setBusy(false);
     }
@@ -35,38 +40,71 @@ export default function Onboarding({ me, initialCode, onDone }: { me: Me; initia
 
   const canSubmit = fullName.trim() && (mode === 'join' ? groupName : name.trim());
   return (
-    <div className="page">
-      <h1>Привет, {me.user.first_name}!</h1>
-      <div className="segmented">
-        <button className={mode === 'join' ? 'active' : ''} onClick={() => setMode('join')}>Я студент</button>
-        <button className={mode === 'create' ? 'active' : ''} onClick={() => setMode('create')}>Я староста</button>
+    <div className="onboarding">
+      <div className="hero-art">
+        <div className="blob b1" /><div className="blob b2" /><div className="blob b3" />
+        <div className="logo big">✓</div>
       </div>
+      <div className="page">
+        <h1 className="display">Привет,<br />{me.user.first_name}</h1>
+        <p className="lead">Отмечайте посещаемость пар в&nbsp;пару касаний — всей группой.</p>
 
-      {mode === 'join' ? (
-        <>
-          <label>Код приглашения</label>
-          <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase().trim())} maxLength={8} placeholder="ABCD2345" />
-          {code.length >= 8 && (groupName ? <p className="ok">Группа: {groupName}</p> : <p className="err">Группа не найдена</p>)}
-        </>
-      ) : (
-        <>
-          <label>Название группы</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={64} placeholder="ИВТ-21" />
-          <label>Сейчас идёт неделя</label>
-          <div className="segmented">
-            <button className={week === 'odd' ? 'active' : ''} onClick={() => setWeek('odd')}>Нечётная</button>
-            <button className={week === 'even' ? 'active' : ''} onClick={() => setWeek('even')}>Чётная</button>
-          </div>
-          <p className="muted small">Часовой пояс группы: {tz}</p>
-        </>
-      )}
+        <div className="role-cards">
+          <button className={'role ' + (mode === 'join' ? 'active' : '')} onClick={() => { haptic.select(); setMode('join'); }}>
+            <Icon name="users" size={22} />
+            <b>Я студент</b>
+            <span>Вступить по коду</span>
+          </button>
+          <button className={'role ' + (mode === 'create' ? 'active' : '')} onClick={() => { haptic.select(); setMode('create'); }}>
+            <Icon name="crown" size={22} />
+            <b>Я староста</b>
+            <span>Создать группу</span>
+          </button>
+        </div>
 
-      <label>Ваши фамилия и имя</label>
-      <input value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={100} placeholder="Иванов Иван" />
-      {err && <p className="err">{err}</p>}
-      <button className="primary" disabled={!canSubmit || busy} onClick={submit}>
-        {mode === 'join' ? 'Вступить в группу' : 'Создать группу'}
-      </button>
+        <div className="form card">
+          {mode === 'join' ? (
+            <>
+              <Field label="Код приглашения">
+                <input className="code-input" value={code} onChange={(e) => setCode(e.target.value.toUpperCase().trim())} maxLength={8} placeholder="ABCD2345" />
+              </Field>
+              {code.length >= 8 && (groupName
+                ? <div className="pill ok"><Icon name="check" size={14} /> {groupName}</div>
+                : <div className="pill bad"><Icon name="x" size={14} /> Группа не найдена</div>)}
+            </>
+          ) : (
+            <>
+              <Field label="Название группы">
+                <input value={name} onChange={(e) => setName(e.target.value)} maxLength={64} placeholder="ИВТ-21" />
+              </Field>
+              <Field label="Сейчас идёт неделя">
+                <div className="segmented">
+                  <button className={week === 'odd' ? 'active' : ''} onClick={() => setWeek('odd')}>Нечётная</button>
+                  <button className={week === 'even' ? 'active' : ''} onClick={() => setWeek('even')}>Чётная</button>
+                </div>
+              </Field>
+            </>
+          )}
+          <Field label="Фамилия и имя">
+            <input value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={100} placeholder="Иванов Иван" />
+          </Field>
+          {mode === 'create' && <p className="hint">Часовой пояс: {tz}</p>}
+          {err && <p className="error-text">{err}</p>}
+        </div>
+
+        <button className="btn primary xl" disabled={!canSubmit || busy} onClick={submit}>
+          {busy ? 'Секунду…' : mode === 'join' ? 'Вступить в группу' : 'Создать группу'}
+        </button>
+      </div>
     </div>
+  );
+}
+
+export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+    </label>
   );
 }
