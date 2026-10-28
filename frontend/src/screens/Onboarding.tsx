@@ -3,7 +3,7 @@ import { api } from '../api';
 import type { Me } from '../types';
 import { Icon } from '../icons';
 import { haptic } from '../telegram';
-import { humanError } from '../ui';
+import { Footer, humanError } from '../ui';
 
 export default function Onboarding({ me, initialCode, onDone }: { me: Me; initialCode: string; onDone: () => void }) {
   const [mode, setMode] = useState<'join' | 'create'>(initialCode ? 'join' : 'create');
@@ -89,6 +89,7 @@ export default function Onboarding({ me, initialCode, onDone }: { me: Me; initia
           {busy ? 'Секунду…' : mode === 'join' ? 'Вступить в группу' : 'Создать группу'}
         </button>
       </div>
+      <Footer />
     </div>
   );
 }

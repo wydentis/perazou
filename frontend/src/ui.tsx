@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './icons';
+import { tg } from './telegram';
 
 // Flat pastel swatches; the initials stay dark on every one of them.
 const SWATCHES = ['#d7ff3d', '#b9a8ff', '#ffb4a2', '#9fe8d0', '#ffd66b', '#a8d8ff', '#ff9ed2', '#c9c9c9'];
@@ -87,4 +88,17 @@ export function humanError(e: unknown): string {
     'init data expired': 'Сессия устарела — перезапустите приложение',
   };
   return map[m] ?? (m || 'Что-то пошло не так');
+}
+
+const AUTHOR_TG = 'wydentis';
+
+/** Authorship credit shown at the bottom of every screen. */
+export function Footer() {
+  const url = `https://t.me/${AUTHOR_TG}`;
+  return (
+    <footer className="footer">
+      Автор — Kiryl Sapeha · tg:{' '}
+      <a href={url} onClick={(e) => { if (tg) { e.preventDefault(); tg.openTelegramLink(url); } }}>@{AUTHOR_TG}</a>
+    </footer>
+  );
 }
