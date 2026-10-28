@@ -36,14 +36,17 @@ export interface Lesson extends Slot {
   open: boolean;
   closes_at: string;
   my_status: Status;
+  my_auto: boolean;
   present: number;
   absent: number;
+  auto_absent: number;
   total: number;
 }
 export interface AttendanceRow {
   user_id: number;
   full_name: string;
   status: Status;
+  auto: boolean; // "absent" set automatically after the marking window closed
 }
 export interface StatRow {
   user_id: number;
