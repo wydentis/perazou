@@ -36,8 +36,13 @@ export function isOddWeek(week1Monday: string, date: string): boolean {
   const weeks = Math.floor(days / 7);
   return ((weeks % 2) + 2) % 2 === 0;
 }
-export function occursOn(slot: { weekday: number; parity: number }, week1Monday: string, date: string): boolean {
+export function occursOn(
+  slot: { weekday: number; parity: number; valid_from?: string; valid_to?: string },
+  week1Monday: string,
+  date: string,
+): boolean {
   if (slot.weekday !== isoWeekday(date)) return false;
+  if ((slot.valid_from && date < slot.valid_from) || (slot.valid_to && date > slot.valid_to)) return false;
   if (slot.parity === 1) return isOddWeek(week1Monday, date);
   if (slot.parity === 2) return !isOddWeek(week1Monday, date);
   return true;
@@ -53,6 +58,16 @@ export function nowMinutesIn(tz: string): number {
 export function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;
+}
+/** "2026-10-24" -> "24.10" */
+export function shortDate(s: string): string {
+  return s ? `${s.slice(8, 10)}.${s.slice(5, 7)}` : '';
+}
+export function rangeLabel(from: string, to: string): string {
+  if (from && to) return from === to ? shortDate(from) : `${shortDate(from)}–${shortDate(to)}`;
+  if (from) return `с ${shortDate(from)}`;
+  if (to) return `до ${shortDate(to)}`;
+  return '';
 }
 export function plural(n: number, one: string, few: string, many: string): string {
   const m10 = n % 10, m100 = n % 100;

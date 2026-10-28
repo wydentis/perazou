@@ -105,6 +105,8 @@ func newRouter(a *app) *gin.Engine {
 	m.POST("/schedule", headmanOnly, a.createSlot)
 	m.PUT("/schedule/:id", headmanOnly, a.updateSlot)
 	m.DELETE("/schedule/:id", headmanOnly, a.deleteSlot)
+	m.POST("/schedule/import/parse", headmanOnly, a.parseImport)
+	m.POST("/schedule/import/apply", headmanOnly, a.applyImport)
 
 	m.GET("/lessons", a.listLessons)
 	m.GET("/lessons/attendance", headmanOnly, a.lessonAttendance)

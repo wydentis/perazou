@@ -11,7 +11,10 @@ type slot struct {
 	EndTime   string `json:"end_time"`
 	Subject   string `json:"subject"`
 	Room      string `json:"room"`
-	Parity    int    `json:"parity"` // 0 every week, 1 odd, 2 even
+	Teacher   string `json:"teacher"`
+	Parity    int    `json:"parity"`     // 0 every week, 1 odd, 2 even
+	ValidFrom string `json:"valid_from"` // YYYY-MM-DD or "" (no bound)
+	ValidTo   string `json:"valid_to"`
 }
 
 const dateLayout = "2006-01-02"
@@ -43,6 +46,10 @@ func (s slot) occursOn(week1Monday, date time.Time) bool {
 	if s.Weekday != isoWeekday(date) {
 		return false
 	}
+	// Dates are compared as YYYY-MM-DD strings, which sort chronologically.
+	if d := date.Format(dateLayout); (s.ValidFrom != "" && d < s.ValidFrom) || (s.ValidTo != "" && d > s.ValidTo) {
+		return false
+	}
 	switch s.Parity {
 	case 1:
 		return isOddWeek(week1Monday, date)
@@ -65,8 +72,20 @@ func clockMinutes(s string) int {
 	return t.Hour()*60 + t.Minute()
 }
 
+// markWindow is how long after a lesson starts students may mark themselves.
+const markWindow = 15
+
+// markClosesAt returns the "HH:MM" at which student marking closes for a lesson.
+func markClosesAt(startTime string) string {
+	m := clockMinutes(startTime) + markWindow
+	if m >= 24*60 {
+		m = 24*60 - 1
+	}
+	return time.Date(0, 1, 1, m/60, m%60, 0, 0, time.UTC).Format("15:04")
+}
+
 // lessonState describes where a lesson is relative to "now" in the group's timezone.
-// Students may mark themselves only while the lesson's day is current and it has started;
+// Students may mark themselves during the first markWindow minutes of the lesson;
 // the headman may edit any lesson that has started.
 func lessonState(now time.Time, date time.Time, startTime string) (started, studentOpen bool) {
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
@@ -76,6 +95,6 @@ func lessonState(now time.Time, date time.Time, startTime string) (started, stud
 	if date.After(today) {
 		return false, false
 	}
-	started = now.Hour()*60+now.Minute() >= clockMinutes(startTime)
-	return started, started
+	nowMin, start := now.Hour()*60+now.Minute(), clockMinutes(startTime)
+	return nowMin >= start, nowMin >= start && nowMin < clockMinutes(markClosesAt(startTime))
 }

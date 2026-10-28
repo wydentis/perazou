@@ -76,7 +76,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export function humanError(e: unknown): string {
   const m = (e as Error)?.message ?? '';
   const map: Record<string, string> = {
-    'marking is closed for this lesson': 'Отметка по этой паре уже закрыта',
+    'marking is closed for this lesson': 'Отметиться можно только в первые 15 минут пары',
     'lesson has not started yet': 'Пара ещё не началась',
     'lesson is cancelled': 'Пара отменена',
     'invite not found': 'Приглашение не найдено',

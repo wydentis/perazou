@@ -23,7 +23,10 @@ export interface Slot {
   end_time: string;
   subject: string;
   room: string;
+  teacher: string;
   parity: 0 | 1 | 2;
+  valid_from: string; // YYYY-MM-DD or ''
+  valid_to: string;
 }
 export type Status = 'present' | 'absent' | '';
 export interface Lesson extends Slot {
@@ -31,6 +34,7 @@ export interface Lesson extends Slot {
   cancelled: boolean;
   started: boolean;
   open: boolean;
+  closes_at: string;
   my_status: Status;
   present: number;
   absent: number;
@@ -54,6 +58,25 @@ export interface Stats {
   to: string;
   lessons: number;
   rows: StatRow[];
+}
+export interface ImportLesson {
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  subject: string;
+  sub: '' | 'А' | 'Б';
+  teacher_a: string;
+  teacher_b: string;
+  room_a: string;
+  room_b: string;
+  parity: 0 | 1 | 2;
+  valid_from: string;
+  valid_to: string;
+  note: string;
+}
+export interface ImportGroup {
+  name: string;
+  lessons: ImportLesson[];
 }
 export interface GroupDetails {
   group: Group;

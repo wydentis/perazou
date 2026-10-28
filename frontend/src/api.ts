@@ -1,5 +1,5 @@
 import { tg } from './telegram';
-import type { AttendanceRow, GroupDetails, Lesson, Me, Slot, Stats } from './types';
+import type { AttendanceRow, GroupDetails, ImportGroup, Lesson, Me, Slot, Stats } from './types';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -11,10 +11,11 @@ export class ApiError extends Error {
 const dev = new URLSearchParams(location.search).get('dev');
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const isForm = body instanceof FormData;
+  const headers: Record<string, string> = isForm ? {} : { 'Content-Type': 'application/json' };
   if (tg?.initData) headers.Authorization = 'tma ' + tg.initData;
   else if (dev) headers['X-Dev-User'] = encodeURIComponent(dev); // headers must be ASCII
-  const res = await fetch('/api' + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await fetch('/api' + path, { method, headers, body: body === undefined ? undefined : isForm ? body : JSON.stringify(body) });
   if (!res.ok) {
     let msg = res.statusText;
     try {
@@ -44,6 +45,14 @@ export const api = {
   saveSlot: (slot: Omit<Slot, 'id'>, id?: number) =>
     id ? request<Slot>('PUT', `/schedule/${id}`, slot) : request<Slot>('POST', '/schedule', slot),
   deleteSlot: (id: number) => request<void>('DELETE', `/schedule/${id}`),
+  importFromUrl: (url: string) => request<{ groups: ImportGroup[] }>('POST', '/schedule/import/parse', { url }),
+  importFromFile: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return request<{ groups: ImportGroup[] }>('POST', '/schedule/import/parse', fd);
+  },
+  importApply: (slots: Omit<Slot, 'id'>[], replace: boolean) =>
+    request<{ created: number; skipped: number }>('POST', '/schedule/import/apply', { slots, replace }),
   lessons: (date: string) => request<Lesson[]>('GET', `/lessons?date=${date}`),
   lessonAttendance: (slotId: number, date: string) =>
     request<AttendanceRow[]>('GET', `/lessons/attendance?slot_id=${slotId}&date=${date}`),

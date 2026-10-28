@@ -25,6 +25,12 @@ export default function Today({ me }: { me: Me }) {
     setExpanded(null);
     load();
   }, [load]);
+  // The 15-minute marking window opens and closes on its own; keep today's view current.
+  useEffect(() => {
+    if (date !== today) return;
+    const t = setInterval(load, 30_000);
+    return () => clearInterval(t);
+  }, [date, today, load]);
 
   const week = useMemo(() => {
     const mon = mondayOf(date);
@@ -113,7 +119,12 @@ export default function Today({ me }: { me: Me }) {
                   <h2>{l.subject}</h2>
                   <LessonBadge l={l} live={live} />
                 </div>
-                {l.room && <div className="meta"><Icon name="pin" size={14} /> ауд. {l.room}</div>}
+                {(l.room || l.teacher) && (
+                  <div className="meta wrap">
+                    {l.room && <span className="meta-item"><Icon name="pin" size={14} /> {l.room}</span>}
+                    {l.teacher && <span className="meta-item"><Icon name="user" size={14} /> {l.teacher}</span>}
+                  </div>
+                )}
 
                 {!l.cancelled && (
                   <>
@@ -125,6 +136,7 @@ export default function Today({ me }: { me: Me }) {
                         <Icon name="x" size={18} /> Не был
                       </button>
                     </div>
+                    <MarkHint l={l} today={date === today} isHeadman={isHeadman} />
                     <div className="split-bar"><i className="p" style={{ width: pPct + '%' }} /><i className="a" style={{ width: aPct + '%' }} /></div>
                     <div className="meta">
                       <span className="c-ok">{l.present} {plural(l.present, 'был', 'были', 'были')}</span>
@@ -160,8 +172,17 @@ function LessonBadge({ l, live }: { l: Lesson; live: boolean }) {
   if (l.cancelled) return <span className="badge muted">Отменена</span>;
   if (live) return <span className="badge live"><i />Идёт</span>;
   if (!l.started) return <span className="badge muted">Скоро</span>;
-  if (l.open) return <span className="badge accent">Отметка</span>;
+  if (l.open) return <span className="badge accent">До {l.closes_at}</span>;
   return <span className="badge muted">Закрыта</span>;
+}
+
+function MarkHint({ l, today, isHeadman }: { l: Lesson; today: boolean; isHeadman: boolean }) {
+  let text: string;
+  if (!l.started) text = `Отметка откроется в ${l.start_time} на 15 минут`;
+  else if (l.open) text = `Отметиться можно до ${l.closes_at}`;
+  else text = today ? `Отметка закрылась в ${l.closes_at}` : 'Отметка закрыта';
+  if (isHeadman && l.started && !l.open) text += ' · исправить можно в «Списке»';
+  return <div className={'mark-hint' + (l.open ? ' live' : '')}><Icon name="clock" size={14} /> {text}</div>;
 }
 
 function Roster({ lesson, onChange }: { lesson: Lesson; onChange: () => void }) {

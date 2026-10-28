@@ -18,20 +18,34 @@ type slotReq struct {
 	EndTime   string `json:"end_time"`
 	Subject   string `json:"subject"`
 	Room      string `json:"room"`
+	Teacher   string `json:"teacher"`
 	Parity    int    `json:"parity"`
+	ValidFrom string `json:"valid_from"`
+	ValidTo   string `json:"valid_to"`
+}
+
+func validDateOrEmpty(s string) bool {
+	if s == "" {
+		return true
+	}
+	_, err := parseDate(s)
+	return err == nil
 }
 
 func (r *slotReq) validate() bool {
-	r.Subject, r.Room = cleanName(r.Subject, 100), cleanName(r.Room, 30)
+	r.Subject, r.Room, r.Teacher = cleanName(r.Subject, 100), cleanName(r.Room, 60), cleanName(r.Teacher, 120)
 	return r.Subject != "" && r.Weekday >= 1 && r.Weekday <= 7 && r.Parity >= 0 && r.Parity <= 2 &&
-		clockRe.MatchString(r.StartTime) && clockRe.MatchString(r.EndTime) && r.EndTime > r.StartTime
+		clockRe.MatchString(r.StartTime) && clockRe.MatchString(r.EndTime) && r.EndTime > r.StartTime &&
+		validDateOrEmpty(r.ValidFrom) && validDateOrEmpty(r.ValidTo) &&
+		(r.ValidFrom == "" || r.ValidTo == "" || r.ValidTo >= r.ValidFrom)
 }
 
-const slotCols = `id, weekday, to_char(start_time,'HH24:MI'), to_char(end_time,'HH24:MI'), subject, room, parity`
+const slotCols = `id, weekday, to_char(start_time,'HH24:MI'), to_char(end_time,'HH24:MI'), subject, room, teacher, parity,
+	COALESCE(to_char(valid_from,'YYYY-MM-DD'),''), COALESCE(to_char(valid_to,'YYYY-MM-DD'),'')`
 
 func scanSlot(row pgx.Row) (slot, error) {
 	var s slot
-	err := row.Scan(&s.ID, &s.Weekday, &s.StartTime, &s.EndTime, &s.Subject, &s.Room, &s.Parity)
+	err := row.Scan(&s.ID, &s.Weekday, &s.StartTime, &s.EndTime, &s.Subject, &s.Room, &s.Teacher, &s.Parity, &s.ValidFrom, &s.ValidTo)
 	return s, err
 }
 
@@ -71,9 +85,9 @@ func (a *app) createSlot(c *gin.Context) {
 		return
 	}
 	s, err := scanSlot(a.db.QueryRow(c, `
-		INSERT INTO schedule_slots (group_id, weekday, start_time, end_time, subject, room, parity)
-		VALUES ($1,$2,$3::time,$4::time,$5,$6,$7) RETURNING `+slotCols,
-		sess(c).Group.ID, req.Weekday, req.StartTime, req.EndTime, req.Subject, req.Room, req.Parity))
+		INSERT INTO schedule_slots (group_id, weekday, start_time, end_time, subject, room, teacher, parity, valid_from, valid_to)
+		VALUES ($1,$2,$3::time,$4::time,$5,$6,$7,$8,NULLIF($9,'')::date,NULLIF($10,'')::date) RETURNING `+slotCols,
+		sess(c).Group.ID, req.Weekday, req.StartTime, req.EndTime, req.Subject, req.Room, req.Teacher, req.Parity, req.ValidFrom, req.ValidTo))
 	if err != nil {
 		serverErr(c, err)
 		return
@@ -95,9 +109,10 @@ func (a *app) updateSlot(c *gin.Context) {
 		return
 	}
 	s, err := scanSlot(a.db.QueryRow(c, `
-		UPDATE schedule_slots SET weekday=$3, start_time=$4::time, end_time=$5::time, subject=$6, room=$7, parity=$8
+		UPDATE schedule_slots SET weekday=$3, start_time=$4::time, end_time=$5::time, subject=$6, room=$7, teacher=$8, parity=$9,
+			valid_from=NULLIF($10,'')::date, valid_to=NULLIF($11,'')::date
 		WHERE id=$1 AND group_id=$2 RETURNING `+slotCols,
-		id, sess(c).Group.ID, req.Weekday, req.StartTime, req.EndTime, req.Subject, req.Room, req.Parity))
+		id, sess(c).Group.ID, req.Weekday, req.StartTime, req.EndTime, req.Subject, req.Room, req.Teacher, req.Parity, req.ValidFrom, req.ValidTo))
 	if err == pgx.ErrNoRows {
 		fail(c, http.StatusNotFound, "slot not found")
 		return
@@ -151,11 +166,12 @@ type lesson struct {
 	Cancelled bool   `json:"cancelled"`
 	Started   bool   `json:"started"`
 	// Open: the caller may change their own mark right now.
-	Open    bool   `json:"open"`
-	MyState string `json:"my_status"` // present | absent | "" (not marked)
-	Present int    `json:"present"`
-	Absent  int    `json:"absent"`
-	Total   int    `json:"total"`
+	Open     bool   `json:"open"`
+	ClosesAt string `json:"closes_at"` // when student marking closes ("HH:MM")
+	MyState  string `json:"my_status"` // present | absent | "" (not marked)
+	Present  int    `json:"present"`
+	Absent   int    `json:"absent"`
+	Total    int    `json:"total"`
 }
 
 func (a *app) listLessons(c *gin.Context) {
@@ -241,7 +257,7 @@ func (a *app) listLessons(c *gin.Context) {
 			continue
 		}
 		started, open := lessonState(now, date, sl.StartTime)
-		l := lesson{slot: sl, Date: dateStr, Cancelled: cancelled[sl.ID], Started: started, Total: total}
+		l := lesson{slot: sl, Date: dateStr, Cancelled: cancelled[sl.ID], Started: started, Total: total, ClosesAt: markClosesAt(sl.StartTime)}
 		l.Open = open && !l.Cancelled
 		if g := aggs[sl.ID]; g != nil {
 			l.Present, l.Absent, l.MyState = g.present, g.absent, g.mine
