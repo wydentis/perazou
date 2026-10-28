@@ -13,6 +13,8 @@ export default function GroupScreen({ me, onChanged }: { me: Me; onChanged: () =
   const [d, setD] = useState<GroupDetails | null>(null);
   const [name, setName] = useState(me.group!.name);
   const [myName, setMyName] = useState(me.member!.full_name);
+  // Headman renaming a student inline: whose row is open and the draft name.
+  const [renaming, setRenaming] = useState<{ id: number; name: string } | null>(null);
   const load = useCallback(() => {
     api.group().then(setD, (e) => toast(humanError(e)));
   }, [toast]);
@@ -82,7 +84,19 @@ export default function GroupScreen({ me, onChanged }: { me: Me; onChanged: () =
         </h3>
         {!d ? <Skeleton h={160} /> : (
           <div className="card list">
-            {d.members.map((m) => (
+            {d.members.map((m) => renaming?.id === m.user_id ? (
+              <form key={m.user_id} className="list-row rename-row" onSubmit={(e) => {
+                e.preventDefault();
+                run(() => api.rename(m.user_id, renaming.name), 'Имя изменено', () => { setRenaming(null); load(); })();
+              }}>
+                <Avatar name={renaming.name || m.full_name} id={m.user_id} />
+                <input className="grow" value={renaming.name} maxLength={100} autoFocus
+                  onChange={(e) => setRenaming({ id: m.user_id, name: e.target.value })} />
+                <button type="submit" className="icon-btn ok" aria-label="Сохранить"
+                  disabled={!renaming.name.trim() || renaming.name.trim() === m.full_name}><Icon name="check" size={18} /></button>
+                <button type="button" className="icon-btn" aria-label="Отмена" onClick={() => setRenaming(null)}><Icon name="x" size={18} /></button>
+              </form>
+            ) : (
               <div key={m.user_id} className="list-row">
                 <Avatar name={m.full_name} id={m.user_id} />
                 <div className="grow">
@@ -92,6 +106,10 @@ export default function GroupScreen({ me, onChanged }: { me: Me; onChanged: () =
                   </div>
                   <div className="meta">{m.role === 'headman' ? <><Icon name="crown" size={13} /> староста</> : m.username ? '@' + m.username : 'студент'}</div>
                 </div>
+                {isHeadman && m.user_id !== me.member!.user_id && (
+                  <button className="icon-btn ghost" aria-label="Переименовать"
+                    onClick={() => setRenaming({ id: m.user_id, name: m.full_name })}><Icon name="edit" size={17} /></button>
+                )}
                 {isHeadman && m.role !== 'headman' && (
                   <button className="icon-btn danger" aria-label="Исключить" onClick={run(async () => {
                     if (await confirmDialog(`Исключить ${m.full_name}? Его отметки будут удалены.`)) await api.removeMember(m.user_id);

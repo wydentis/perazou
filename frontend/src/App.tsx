@@ -3,7 +3,7 @@ import { api, hasCredentials } from './api';
 import type { Me } from './types';
 import { haptic, inviteCodeFromLaunch } from './telegram';
 import { Icon, type IconName } from './icons';
-import { humanError } from './ui';
+import { Footer, humanError } from './ui';
 import Onboarding from './screens/Onboarding';
 import Today from './screens/Today';
 import Schedule from './screens/Schedule';
@@ -46,6 +46,7 @@ export default function App() {
         {tab === 'schedule' && <Schedule group={me.group} isHeadman={isHeadman} />}
         {tab === 'stats' && <StatsScreen me={me} />}
         {tab === 'group' && <GroupScreen me={me} onChanged={reload} />}
+        <Footer />
       </main>
       <nav className="tabbar">
         {TABS.map((t) => (

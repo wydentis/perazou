@@ -369,3 +369,11 @@ button.list-row:not(:disabled):active { background: var(--surface-2); }
 input[type='date'] { min-height: 49px; }
 .file-btn.disabled { opacity: .35; }
 .auto-tag { margin-left: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--surface-2); padding: 2px 6px; border-radius: 6px; vertical-align: 2px; }
+
+/* ---------- footer ---------- */
+.footer { max-width: 560px; margin: 8px auto 0; padding: 16px 16px 20px; text-align: center; font-size: 12px; font-weight: 500; color: var(--muted); }
+.footer a { color: var(--text); font-weight: 600; text-decoration: none; border-bottom: 1.5px solid var(--lime); }
+.icon-btn.ghost { border-color: transparent; background: transparent; color: var(--muted); width: 36px; height: 36px; border-radius: 12px; }
+.icon-btn.ok { background: var(--lime); color: var(--ink); border-color: var(--lime); width: 40px; height: 40px; }
+.icon-btn.ok:disabled { opacity: .35; }
+.rename-row input { padding: 10px 12px; min-width: 0; }
