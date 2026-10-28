@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, hasCredentials } from './api';
 import type { Me } from './types';
-import { haptic, inviteCodeFromLaunch } from './telegram';
+import { ensureWriteAccess, haptic, inviteCodeFromLaunch } from './telegram';
 import { Icon, type IconName } from './icons';
-import { Footer, humanError } from './ui';
+import { Footer, humanError, useToast } from './ui';
 import Onboarding from './screens/Onboarding';
 import Today from './screens/Today';
 import Schedule from './screens/Schedule';
@@ -22,6 +22,7 @@ export default function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<Tab>('today');
+  const toast = useToast();
 
   const reload = useCallback(() => {
     api.me().then(setMe, (e) => setError(humanError(e)));
@@ -33,6 +34,12 @@ export default function App() {
     }
     reload();
   }, [reload]);
+
+  // Once the user is in a group, make sure the bot may send them lesson reminders.
+  const inGroup = Boolean(me?.member);
+  useEffect(() => {
+    if (inGroup) ensureWriteAccess(() => toast('Напоминания о парах включены', 'ok'));
+  }, [inGroup, toast]);
 
   if (error) return <Splash text={error} />;
   if (!me) return <Splash loading />;

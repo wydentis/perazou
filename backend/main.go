@@ -37,6 +37,7 @@ func main() {
 	if a.bot != nil {
 		// Registered after the router exists, so the webhook endpoint is live when Telegram calls it.
 		go a.bot.run(ctx, cfg.BotPolling)
+		go a.runNotifier(ctx)
 	}
 	go func() {
 		<-ctx.Done()
