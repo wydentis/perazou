@@ -54,3 +54,12 @@ func TestWebhook(t *testing.T) {
 		}
 	}
 }
+
+func TestProfileTextsFitTelegramLimits(t *testing.T) {
+	if n := len([]rune(botShortDescription)); n > 120 {
+		t.Errorf("short description is %d characters, limit 120", n)
+	}
+	if n := len([]rune(botDescription)); n > 512 {
+		t.Errorf("description is %d characters, limit 512", n)
+	}
+}

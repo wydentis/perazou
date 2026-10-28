@@ -79,8 +79,41 @@ type update struct {
 	} `json:"message"`
 }
 
+// Bot profile texts, applied on every start so the code is the single source of truth.
+// Telegram limits: short description 120 characters, description 512.
+const (
+	botShortDescription = "Посещаемость пар в один тап: староста видит всю группу, бот напоминает отметиться в начале пары."
+	botDescription      = `Посещаемость пар для старост и студентов — прямо в Telegram.
+
+• Староста создаёт группу и делится ссылкой-приглашением
+• Расписание — вручную или импортом из таблицы факультета
+• Отметка «был / не был» за 15 минут до и 30 минут после начала пары
+• Бот напоминает в начале пары, а кто не отметился — автоматически «не был»
+• Итоги посещаемости по каждому студенту
+
+Нажмите «Старт», чтобы открыть приложение.`
+)
+
+// applyProfile sets the bot's description, short description and command list.
+func (b *bot) applyProfile(ctx context.Context) {
+	calls := []struct {
+		method  string
+		payload map[string]any
+	}{
+		{"setMyShortDescription", map[string]any{"short_description": botShortDescription}},
+		{"setMyDescription", map[string]any{"description": botDescription}},
+		{"setMyCommands", map[string]any{"commands": []map[string]string{{"command": "start", "description": "Открыть приложение"}}}},
+	}
+	for _, c := range calls {
+		if err := b.call(ctx, c.method, c.payload, nil); err != nil {
+			log.Println("bot:", err)
+		}
+	}
+}
+
 // run registers the bot with Telegram and, in polling mode, consumes updates until ctx ends.
 func (b *bot) run(ctx context.Context, polling bool) {
+	b.applyProfile(ctx)
 	// The menu button next to the input field opens the Mini App too.
 	if err := b.call(ctx, "setChatMenuButton", map[string]any{
 		"menu_button": map[string]any{"type": "web_app", "text": "Посещаемость", "web_app": map[string]string{"url": b.webURL}},
