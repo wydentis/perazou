@@ -31,6 +31,9 @@ type bot struct {
 
 const webhookPath = "/telegram/webhook"
 
+// telegramAPI is a var so a test build can point it elsewhere (-ldflags -X main.telegramAPI=…).
+var telegramAPI = "https://api.telegram.org"
+
 func newBot(token, webURL string) *bot {
 	// Derived from the token so every replica agrees without extra configuration, and it
 	// changes whenever the token is rotated. Telegram allows [A-Za-z0-9_-]{1,256}.
@@ -40,7 +43,7 @@ func newBot(token, webURL string) *bot {
 
 func (b *bot) call(ctx context.Context, method string, payload any, out any) error {
 	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.telegram.org/bot"+b.token+"/"+method, bytes.NewReader(body))
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, telegramAPI+"/bot"+b.token+"/"+method, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := b.http.Do(req)
 	if err != nil {

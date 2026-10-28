@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"regexp"
 	"sort"
@@ -49,7 +50,7 @@ func scanSlot(row pgx.Row) (slot, error) {
 	return s, err
 }
 
-func (a *app) slots(c *gin.Context, groupID int64) ([]slot, error) {
+func (a *app) slots(c context.Context, groupID int64) ([]slot, error) {
 	rows, err := a.db.Query(c, `SELECT `+slotCols+` FROM schedule_slots WHERE group_id=$1 ORDER BY weekday, start_time, id`, groupID)
 	if err != nil {
 		return nil, err
