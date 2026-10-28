@@ -13,6 +13,28 @@ export interface Me {
   user: { id: number; first_name: string };
   member: Member | null;
   group: Group | null;
+  is_admin: boolean;
+}
+export interface AdminUser {
+  id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  role: '' | 'headman' | 'student';
+  group_id: number | null;
+  group_name: string;
+  created_at: string;
+  joined_at: string | null;
+}
+export interface AdminGroup {
+  id: number;
+  name: string;
+  headman: string;
+  members: number;
+  slots: number;
+  marks: number;
+  created_at: string;
 }
 export interface Slot {
   id: number;

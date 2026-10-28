@@ -50,6 +50,8 @@ Go (Gin, pgx) · PostgreSQL 16 · React + TypeScript (Vite) · Caddy (HTTPS) · 
    - `BOT_USERNAME` — username бота без @
    - `WEBAPP_URL` = `https://perazou.wydentis.xyz`
    - `MINIAPP_SHORT_NAME` — только если Mini App именованное (см. ниже)
+   - `ADMIN_USERNAMES` / `ADMIN_IDS` — кому доступна вкладка «Админ» со всеми пользователями и группами
+     (через запятую; username без @, сверяется по подписанным Telegram данным)
 4. Settings → Networking → Custom Domain → `perazou.wydentis.xyz`; у регистратора домена добавьте
    записи, которые покажет Railway (CNAME на `*.up.railway.app`, при необходимости TXT для проверки).
 5. После деплоя в Deploy Logs должна появиться строка `bot: webhook registered at …`. Пока домен или

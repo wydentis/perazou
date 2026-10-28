@@ -5,7 +5,9 @@ import { Icon } from '../icons';
 import { haptic } from '../telegram';
 import { Footer, humanError } from '../ui';
 
-export default function Onboarding({ me, initialCode, onDone }: { me: Me; initialCode: string; onDone: () => void }) {
+export default function Onboarding({ me, initialCode, onDone, onAdmin }: {
+  me: Me; initialCode: string; onDone: () => void; onAdmin?: () => void;
+}) {
   const [mode, setMode] = useState<'join' | 'create'>(initialCode ? 'join' : 'create');
   const [code, setCode] = useState(initialCode);
   const [groupName, setGroupName] = useState<string | null>(null);
@@ -88,6 +90,7 @@ export default function Onboarding({ me, initialCode, onDone }: { me: Me; initia
         <button className="btn primary xl" disabled={!canSubmit || busy} onClick={submit}>
           {busy ? 'Секунду…' : mode === 'join' ? 'Вступить в группу' : 'Создать группу'}
         </button>
+        {onAdmin && <button className="btn ghost" onClick={onAdmin}><Icon name="shield" size={18} /> Админка</button>}
       </div>
       <Footer />
     </div>

@@ -376,3 +376,22 @@ input[type='date'] { min-height: 49px; }
 .icon-btn.ok { background: var(--lime); color: var(--ink); border-color: var(--lime); width: 40px; height: 40px; }
 .icon-btn.ok:disabled { opacity: .35; }
 .rename-row input { padding: 10px 12px; min-width: 0; }
+
+/* ---------- section spacing ---------- */
+/* A heading, its card and any action button below it get breathing room. */
+section { display: flex; flex-direction: column; gap: 10px; }
+.day-section { gap: 10px; }
+.section-title { margin: 8px 4px 0; }
+section > .card + .btn, .page > .card + .btn { margin-top: 4px; }
+
+/* ---------- admin ---------- */
+.stat-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.stat-tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.stat-tile b { font-family: var(--font-display); font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+.stat-tile span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.stat-tile.accent { background: var(--lime); border-color: var(--lime); color: var(--ink); }
+.stat-tile.accent span { color: var(--ink); opacity: .65; }
+.search { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 0 14px; color: var(--muted); }
+.search input { background: transparent; border: 0; padding: 14px 0; }
+.search input:focus { background: transparent; border: 0; }
+.tabbar button { min-width: 0; }
