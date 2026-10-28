@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata" // group timezones must resolve even on images without tzdata
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

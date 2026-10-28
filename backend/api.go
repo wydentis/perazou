@@ -86,6 +86,9 @@ func newRouter(a *app) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery(), gin.Logger())
 	r.GET("/healthz", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
+	if a.cfg.StaticDir != "" {
+		r.NoRoute(spaHandler(a.cfg.StaticDir))
+	}
 
 	api := r.Group("/api", a.authMiddleware)
 	api.GET("/me", a.getMe)
