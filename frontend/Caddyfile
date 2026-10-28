@@ -1,0 +1,16 @@
+# DOMAIN must be a public domain pointing at this host: Telegram Mini Apps require HTTPS,
+# and Caddy obtains the certificate automatically.
+{$DOMAIN} {
+	encode gzip
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+	handle /healthz {
+		reverse_proxy api:8080
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
