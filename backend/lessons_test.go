@@ -18,23 +18,24 @@ func TestOccursOn(t *testing.T) {
 
 func TestLessonState(t *testing.T) {
 	now := time.Date(2026, 9, 9, 10, 0, 0, 0, time.UTC)
-	if s, o := lessonState(now, d("2026-09-09"), "09:50"); !s || !o {
-		t.Error("lesson started 10 minutes ago must be open")
+	cases := []struct {
+		date, start   string
+		started, open bool
+		why           string
+	}{
+		{"2026-09-09", "10:10", false, true, "10 min before start: window already open"},
+		{"2026-09-09", "10:15", false, true, "window opens exactly 15 min before (inclusive)"},
+		{"2026-09-09", "10:16", false, false, "16 min before start: not open yet"},
+		{"2026-09-09", "09:31", true, true, "29 min after start"},
+		{"2026-09-09", "09:30", true, false, "window closes exactly 30 min after"},
+		{"2026-09-09", "09:00", true, false, "an hour after start"},
+		{"2026-09-08", "09:00", true, false, "past day"},
+		{"2026-09-10", "09:00", false, false, "tomorrow"},
 	}
-	if s, o := lessonState(now, d("2026-09-09"), "09:45"); !s || o {
-		t.Error("marking must close exactly 15 minutes after start")
-	}
-	if s, o := lessonState(now, d("2026-09-09"), "09:00"); !s || o {
-		t.Error("lesson started an hour ago must be closed for students")
-	}
-	if s, o := lessonState(now, d("2026-09-09"), "11:00"); s || o {
-		t.Error("future lesson today must be closed")
-	}
-	if s, o := lessonState(now, d("2026-09-08"), "09:00"); !s || o {
-		t.Error("past day: started but closed for students")
-	}
-	if s, _ := lessonState(now, d("2026-09-10"), "09:00"); s {
-		t.Error("tomorrow not started")
+	for _, c := range cases {
+		if s, o := lessonState(now, d(c.date), c.start); s != c.started || o != c.open {
+			t.Errorf("%s: started=%v open=%v", c.why, s, o)
+		}
 	}
 }
 
@@ -47,11 +48,11 @@ func TestValidRange(t *testing.T) {
 	}
 }
 
-func TestMarkClosesAt(t *testing.T) {
-	if got := markClosesAt("08:15"); got != "08:30" {
-		t.Errorf("got %s", got)
+func TestMarkWindowBounds(t *testing.T) {
+	if o, c := markOpensAt("08:15"), markClosesAt("08:15"); o != "08:00" || c != "08:45" {
+		t.Errorf("08:15: %s-%s", o, c)
 	}
-	if got := markClosesAt("23:50"); got != "23:59" {
-		t.Errorf("late lesson: got %s", got)
+	if o, c := markOpensAt("00:05"), markClosesAt("23:50"); o != "00:00" || c != "23:59" {
+		t.Errorf("clamping: %s %s", o, c)
 	}
 }

@@ -149,7 +149,7 @@ export default function Today({ me }: { me: Me }) {
 
                 {isHeadman && (
                   <div className="lesson-tools">
-                    {l.started && !l.cancelled && (
+                    {(l.started || l.open) && !l.cancelled && (
                       <button className="btn ghost sm" onClick={() => setExpanded(expanded === l.id ? null : l.id)}>
                         <Icon name="users" size={16} /> {expanded === l.id ? 'Скрыть' : 'Список'}
                       </button>
@@ -172,15 +172,15 @@ export default function Today({ me }: { me: Me }) {
 function LessonBadge({ l, live }: { l: Lesson; live: boolean }) {
   if (l.cancelled) return <span className="badge muted">Отменена</span>;
   if (live) return <span className="badge live"><i />Идёт</span>;
-  if (!l.started) return <span className="badge muted">Скоро</span>;
   if (l.open) return <span className="badge accent">До {l.closes_at}</span>;
+  if (!l.started) return <span className="badge muted">Скоро</span>;
   return <span className="badge muted">Закрыта</span>;
 }
 
 function MarkHint({ l, today, isHeadman }: { l: Lesson; today: boolean; isHeadman: boolean }) {
   let text: string;
-  if (!l.started) text = `Отметка откроется в ${l.start_time} на 15 минут`;
-  else if (l.open) text = `Отметиться можно до ${l.closes_at}`;
+  if (l.open) text = `Отметиться можно до ${l.closes_at}`;
+  else if (!l.started) text = `Отметка откроется в ${l.opens_at} — за 15 минут до начала`;
   else if (l.my_auto) text = `Не отметились до ${l.closes_at} — автоматически «не был»`;
   else text = today ? `Отметка закрылась в ${l.closes_at}` : 'Отметка закрыта';
   if (isHeadman && l.started && !l.open) text += ' · исправить можно в «Списке»';
