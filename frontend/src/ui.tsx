@@ -85,6 +85,7 @@ export function humanError(e: unknown): string {
     'headman only': 'Доступно только старосте',
     'headman cannot leave the group': 'Староста не может выйти из группы',
     'invalid slot': 'Проверьте поля пары',
+    'admin only': 'Доступно только администратору',
     'init data expired': 'Сессия устарела — перезапустите приложение',
   };
   return map[m] ?? (m || 'Что-то пошло не так');

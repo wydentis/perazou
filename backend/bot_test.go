@@ -63,3 +63,33 @@ func TestProfileTextsFitTelegramLimits(t *testing.T) {
 		t.Errorf("description is %d characters, limit 512", n)
 	}
 }
+
+func TestIsAdmin(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("DEV_AUTH", "true")
+	t.Setenv("ADMIN_IDS", "42, 7")
+	t.Setenv("ADMIN_USERNAMES", "@Wydentis")
+	c, err := loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		u    *tgUser
+		want bool
+	}{
+		{&tgUser{ID: 42}, true},
+		{&tgUser{ID: 1, Username: "wydentis"}, true}, // case-insensitive, "@" stripped
+		{&tgUser{ID: 1, Username: "someone"}, false},
+		{&tgUser{ID: 1}, false},
+		{nil, false},
+	}
+	for _, x := range cases {
+		if got := c.isAdmin(x.u); got != x.want {
+			t.Errorf("%+v: got %v", x.u, got)
+		}
+	}
+	t.Setenv("ADMIN_IDS", "abc")
+	if _, err := loadConfig(); err == nil {
+		t.Error("invalid ADMIN_IDS accepted")
+	}
+}

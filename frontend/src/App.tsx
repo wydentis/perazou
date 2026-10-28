@@ -9,19 +9,22 @@ import Today from './screens/Today';
 import Schedule from './screens/Schedule';
 import StatsScreen from './screens/Stats';
 import GroupScreen from './screens/GroupScreen';
+import AdminScreen from './screens/Admin';
 
-type Tab = 'today' | 'schedule' | 'stats' | 'group';
+type Tab = 'today' | 'schedule' | 'stats' | 'group' | 'admin';
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'today', label: 'Пары', icon: 'calendar' },
   { id: 'schedule', label: 'Расписание', icon: 'grid' },
   { id: 'stats', label: 'Итоги', icon: 'chart' },
   { id: 'group', label: 'Группа', icon: 'users' },
 ];
+const ADMIN_TAB: { id: Tab; label: string; icon: IconName } = { id: 'admin', label: 'Админ', icon: 'shield' };
 
 export default function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<Tab>('today');
+  const [adminOutsideGroup, setAdminOutsideGroup] = useState(false);
   const toast = useToast();
 
   const reload = useCallback(() => {
@@ -43,7 +46,13 @@ export default function App() {
 
   if (error) return <Splash text={error} />;
   if (!me) return <Splash loading />;
-  if (!me.member || !me.group) return <Onboarding me={me} initialCode={inviteCodeFromLaunch()} onDone={reload} />;
+  if (!me.member || !me.group) {
+    // An admin who is not in any group can still reach the admin screen from onboarding.
+    if (adminOutsideGroup) return <AdminScreen onBack={() => setAdminOutsideGroup(false)} />;
+    return <Onboarding me={me} initialCode={inviteCodeFromLaunch()} onDone={reload}
+      onAdmin={me.is_admin ? () => setAdminOutsideGroup(true) : undefined} />;
+  }
+  const tabs = me.is_admin ? [...TABS, ADMIN_TAB] : TABS;
 
   const isHeadman = me.member.role === 'headman';
   return (
@@ -53,10 +62,11 @@ export default function App() {
         {tab === 'schedule' && <Schedule group={me.group} isHeadman={isHeadman} />}
         {tab === 'stats' && <StatsScreen me={me} />}
         {tab === 'group' && <GroupScreen me={me} onChanged={reload} />}
+        {tab === 'admin' && me.is_admin && <AdminScreen />}
         <Footer />
       </main>
       <nav className="tabbar">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button key={t.id} className={tab === t.id ? 'active' : ''}
             onClick={() => { if (t.id !== tab) haptic.select(); setTab(t.id); }}>
             <Icon name={t.icon} size={22} />

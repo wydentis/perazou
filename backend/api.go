@@ -91,6 +91,8 @@ func newRouter(a *app) *gin.Engine {
 	api.GET("/groups/preview", a.previewGroup)
 	api.POST("/groups", a.createGroup)
 	api.POST("/groups/join", a.joinGroup)
+	// Admin routes do not require group membership.
+	api.GET("/admin/overview", a.adminOnly, a.adminOverview)
 
 	m := api.Group("", a.memberMiddleware)
 	m.GET("/group", a.getGroup)
@@ -233,7 +235,7 @@ func (a *app) getMe(c *gin.Context) {
 		serverErr(c, err)
 		return
 	}
-	out := gin.H{"user": u, "member": nil, "group": nil}
+	out := gin.H{"user": u, "member": nil, "group": nil, "is_admin": a.cfg.isAdmin(u)}
 	if s != nil {
 		out["member"] = memberInfo{UserID: s.UserID, FullName: s.FullName, Role: s.Role}
 		out["group"] = s.Group.info()
