@@ -31,6 +31,7 @@ export interface Lesson extends Slot {
   cancelled: boolean;
   started: boolean;
   open: boolean;
+  opens_at: string;
   closes_at: string;
   my_status: Status;
   my_auto: boolean;

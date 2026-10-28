@@ -48,21 +48,25 @@ func clockMinutes(s string) int {
 	return t.Hour()*60 + t.Minute()
 }
 
-// markWindow is how long after a lesson starts students may mark themselves.
-const markWindow = 15
+// Students may mark themselves from markBefore minutes before a lesson starts until
+// markAfter minutes after it started.
+const (
+	markBefore = 15
+	markAfter  = 30
+)
 
-// markClosesAt returns the "HH:MM" at which student marking closes for a lesson.
-func markClosesAt(startTime string) string {
-	m := clockMinutes(startTime) + markWindow
-	if m >= 24*60 {
-		m = 24*60 - 1
-	}
+// clockAt formats minutes since midnight as "HH:MM", clamped to the same day.
+func clockAt(m int) string {
+	m = min(max(m, 0), 24*60-1)
 	return time.Date(0, 1, 1, m/60, m%60, 0, 0, time.UTC).Format("15:04")
 }
 
-// lessonState describes where a lesson is relative to "now" in the group's timezone.
-// Students may mark themselves during the first markWindow minutes of the lesson;
-// the headman may edit any lesson that has started.
+// markOpensAt / markClosesAt return the "HH:MM" bounds of the student marking window.
+func markOpensAt(startTime string) string  { return clockAt(clockMinutes(startTime) - markBefore) }
+func markClosesAt(startTime string) string { return clockAt(clockMinutes(startTime) + markAfter) }
+
+// lessonState describes where a lesson is relative to "now" in the group's timezone:
+// started once its start time has passed, studentOpen while the marking window is open.
 func lessonState(now time.Time, date time.Time, startTime string) (started, studentOpen bool) {
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	if date.Before(today) {
@@ -71,6 +75,7 @@ func lessonState(now time.Time, date time.Time, startTime string) (started, stud
 	if date.After(today) {
 		return false, false
 	}
-	nowMin, start := now.Hour()*60+now.Minute(), clockMinutes(startTime)
-	return nowMin >= start, nowMin >= start && nowMin < clockMinutes(markClosesAt(startTime))
+	nowMin := now.Hour()*60 + now.Minute()
+	return nowMin >= clockMinutes(startTime),
+		nowMin >= clockMinutes(markOpensAt(startTime)) && nowMin < clockMinutes(markClosesAt(startTime))
 }

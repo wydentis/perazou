@@ -77,8 +77,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export function humanError(e: unknown): string {
   const m = (e as Error)?.message ?? '';
   const map: Record<string, string> = {
-    'marking is closed for this lesson': 'Отметиться можно только в первые 15 минут пары',
-    'lesson has not started yet': 'Пара ещё не началась',
+    'marking is closed for this lesson': 'Отметиться можно за 15 минут до и в течение 30 минут после начала пары',
+    'marking has not opened yet': 'Отметка откроется за 15 минут до начала пары',
     'lesson is cancelled': 'Пара отменена',
     'invite not found': 'Приглашение не найдено',
     'already in a group': 'Вы уже состоите в группе',

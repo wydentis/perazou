@@ -167,6 +167,7 @@ type lesson struct {
 	Started   bool   `json:"started"`
 	// Open: the caller may change their own mark right now.
 	Open     bool   `json:"open"`
+	OpensAt  string `json:"opens_at"`  // when student marking opens ("HH:MM")
 	ClosesAt string `json:"closes_at"` // when student marking closes ("HH:MM")
 	MyState  string `json:"my_status"` // present | absent | "" (not marked)
 	MyAuto   bool   `json:"my_auto"`   // my "absent" was set automatically
@@ -278,7 +279,8 @@ func (a *app) listLessons(c *gin.Context) {
 			continue
 		}
 		started, open := lessonState(now, date, sl.StartTime)
-		l := lesson{slot: sl, Date: dateStr, Cancelled: cancelled[sl.ID], Started: started, Total: total, ClosesAt: markClosesAt(sl.StartTime)}
+		l := lesson{slot: sl, Date: dateStr, Cancelled: cancelled[sl.ID], Started: started, Total: total,
+			OpensAt: markOpensAt(sl.StartTime), ClosesAt: markClosesAt(sl.StartTime)}
 		l.Open = open && !l.Cancelled
 		if g := aggs[sl.ID]; g != nil {
 			l.Present, l.Absent, l.MyState = g.present, g.absent, g.mine
@@ -377,7 +379,7 @@ func (a *app) cancelLesson(c *gin.Context) {
 }
 
 // markAttendance: students set their own mark while the lesson is open; the headman can
-// set or clear anyone's mark for any lesson that has started.
+// set or clear anyone's mark for any lesson that has started or whose window is open.
 func (a *app) markAttendance(c *gin.Context) {
 	s := sess(c)
 	var req struct {
@@ -415,8 +417,8 @@ func (a *app) markAttendance(c *gin.Context) {
 		return
 	}
 	started, open := lessonState(s.Group.now(), date, sl.StartTime)
-	if !started {
-		fail(c, http.StatusConflict, "lesson has not started yet")
+	if !started && !open {
+		fail(c, http.StatusConflict, "marking has not opened yet")
 		return
 	}
 	if s.Role != "headman" && !open {
@@ -506,7 +508,8 @@ func (a *app) stats(c *gin.Context) {
 	// Lessons whose student window is still open are the only ones that can be unmarked;
 	// every other missing mark counts as an automatic "absent".
 	var lessonDates []string
-	openLessons := map[string]bool{} // slotID+date
+	startedLessons := map[string]bool{} // slotID+date
+	openLessons := map[string]bool{}
 	var openDates []string
 	for d := from; !d.After(to); d = d.AddDate(0, 0, 1) {
 		for _, sl := range all {
@@ -516,6 +519,7 @@ func (a *app) stats(c *gin.Context) {
 			}
 			if started, open := lessonState(now, d, sl.StartTime); started {
 				lessonDates = append(lessonDates, d.Format(dateLayout))
+				startedLessons[key] = true
 				if open {
 					openLessons[key] = true
 					openDates = append(openDates, d.Format(dateLayout))
@@ -541,10 +545,6 @@ func (a *app) stats(c *gin.Context) {
 		return
 	}
 	defer rows.Close()
-	slotByID := map[int64]slot{}
-	for _, sl := range all {
-		slotByID[sl.ID] = sl
-	}
 	out := []statRow{}
 	idx := map[int64]int{}
 	joinedAt := map[int64]string{}
@@ -568,9 +568,9 @@ func (a *app) stats(c *gin.Context) {
 			continue
 		}
 		dateStr = *dateNullable
-		d, _ := parseDate(dateStr)
-		sl, ok := slotByID[*slotID]
-		if !ok || !sl.occursOn(d) || cancelled[strconv.FormatInt(*slotID, 10)+dateStr] {
+		// Only lessons that have started count: a mark made in the window before the start
+		// must not show up before its lesson does (and stale marks off-schedule are ignored).
+		if !startedLessons[strconv.FormatInt(*slotID, 10)+dateStr] {
 			continue
 		}
 		if status == "present" {
