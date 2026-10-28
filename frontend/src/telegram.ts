@@ -50,7 +50,8 @@ export function inviteCodeFromLaunch(): string {
  */
 export function ensureWriteAccess(onGranted: () => void) {
   const user = tg?.initDataUnsafe?.user;
-  if (!tg?.requestWriteAccess || !user || user.allows_write_to_pm !== false) return;
+  // Telegram only sends allows_write_to_pm when it is true; a missing field means "not allowed".
+  if (!tg?.requestWriteAccess || !user || user.allows_write_to_pm === true) return;
   const key = `write-access-asked:${user.id}`;
   try {
     if (localStorage.getItem(key)) return;
