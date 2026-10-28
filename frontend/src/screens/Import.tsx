@@ -20,7 +20,7 @@ function toSlot(l: ImportLesson, sub: Sub): Omit<Slot, 'id'> | null {
   return {
     weekday: l.weekday, start_time: l.start_time, end_time: l.end_time,
     subject: !sub && l.sub ? `${l.subject} (подгр. ${l.sub})` : l.subject,
-    teacher, room, parity: l.parity, valid_from: l.valid_from, valid_to: l.valid_to,
+    teacher, room, valid_from: l.valid_from, valid_to: l.valid_to,
   };
 }
 
@@ -155,10 +155,9 @@ export default function ImportScreen({ groupName, onClose }: { groupName: string
                           {slot.room && <span className="meta-item"><Icon name="pin" size={13} /> {slot.room}</span>}
                           {slot.teacher && <span className="meta-item"><Icon name="user" size={13} /> {slot.teacher}</span>}
                         </div>
-                        {(slot.valid_from || slot.valid_to || slot.parity > 0) && (
+                        {(slot.valid_from || slot.valid_to) && (
                           <div className="meta" style={{ marginTop: 6 }}>
                             {(slot.valid_from || slot.valid_to) && <span className="badge violet">{rangeLabel(slot.valid_from, slot.valid_to)}</span>}
-                            {slot.parity > 0 && <span className="badge pink">{slot.parity === 1 ? 'нечёт' : 'чёт'}</span>}
                           </div>
                         )}
                         {l.note && <div className="note"><Icon name="alert" size={14} /> {l.note}</div>}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import type { AttendanceRow, Lesson, Me, Slot } from '../types';
-import { addDays, isOddWeek, mondayOf, nowMinutesIn, occursOn, parseDate, plural, todayIn, toMinutes, WEEKDAYS_SHORT } from '../util';
+import { addDays, mondayOf, nowMinutesIn, occursOn, parseDate, plural, todayIn, toMinutes, WEEKDAYS_SHORT } from '../util';
 import { haptic } from '../telegram';
 import { Icon } from '../icons';
 import { Avatar, Empty, Skeleton, humanError, useToast } from '../ui';
@@ -36,9 +36,9 @@ export default function Today({ me }: { me: Me }) {
     const mon = mondayOf(date);
     return Array.from({ length: 7 }, (_, i) => {
       const d = addDays(mon, i);
-      return { d, has: slots.some((s) => occursOn(s, group.week1_monday, d)) };
+      return { d, has: slots.some((s) => occursOn(s, d)) };
     });
-  }, [date, slots, group.week1_monday]);
+  }, [date, slots]);
 
   async function mark(l: Lesson, status: 'present' | 'absent') {
     const next = l.my_status === status ? 'none' : status;
@@ -71,14 +71,13 @@ export default function Today({ me }: { me: Me }) {
   }
 
   const d = parseDate(date);
-  const odd = isOddWeek(group.week1_monday, date);
   const nowMin = nowMinutesIn(group.timezone);
 
   return (
     <div className="page">
       <header className="top">
         <div>
-          <div className="eyebrow">{group.name} · {odd ? 'нечётная' : 'чётная'} неделя</div>
+          <div className="eyebrow">{group.name}</div>
           <h1 className="display">
             {d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
           </h1>

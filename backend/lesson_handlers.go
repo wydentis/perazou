@@ -20,7 +20,6 @@ type slotReq struct {
 	Subject   string `json:"subject"`
 	Room      string `json:"room"`
 	Teacher   string `json:"teacher"`
-	Parity    int    `json:"parity"`
 	ValidFrom string `json:"valid_from"`
 	ValidTo   string `json:"valid_to"`
 }
@@ -35,18 +34,18 @@ func validDateOrEmpty(s string) bool {
 
 func (r *slotReq) validate() bool {
 	r.Subject, r.Room, r.Teacher = cleanName(r.Subject, 100), cleanName(r.Room, 60), cleanName(r.Teacher, 120)
-	return r.Subject != "" && r.Weekday >= 1 && r.Weekday <= 7 && r.Parity >= 0 && r.Parity <= 2 &&
+	return r.Subject != "" && r.Weekday >= 1 && r.Weekday <= 7 &&
 		clockRe.MatchString(r.StartTime) && clockRe.MatchString(r.EndTime) && r.EndTime > r.StartTime &&
 		validDateOrEmpty(r.ValidFrom) && validDateOrEmpty(r.ValidTo) &&
 		(r.ValidFrom == "" || r.ValidTo == "" || r.ValidTo >= r.ValidFrom)
 }
 
-const slotCols = `id, weekday, to_char(start_time,'HH24:MI'), to_char(end_time,'HH24:MI'), subject, room, teacher, parity,
+const slotCols = `id, weekday, to_char(start_time,'HH24:MI'), to_char(end_time,'HH24:MI'), subject, room, teacher,
 	COALESCE(to_char(valid_from,'YYYY-MM-DD'),''), COALESCE(to_char(valid_to,'YYYY-MM-DD'),'')`
 
 func scanSlot(row pgx.Row) (slot, error) {
 	var s slot
-	err := row.Scan(&s.ID, &s.Weekday, &s.StartTime, &s.EndTime, &s.Subject, &s.Room, &s.Teacher, &s.Parity, &s.ValidFrom, &s.ValidTo)
+	err := row.Scan(&s.ID, &s.Weekday, &s.StartTime, &s.EndTime, &s.Subject, &s.Room, &s.Teacher, &s.ValidFrom, &s.ValidTo)
 	return s, err
 }
 
@@ -86,9 +85,9 @@ func (a *app) createSlot(c *gin.Context) {
 		return
 	}
 	s, err := scanSlot(a.db.QueryRow(c, `
-		INSERT INTO schedule_slots (group_id, weekday, start_time, end_time, subject, room, teacher, parity, valid_from, valid_to)
-		VALUES ($1,$2,$3::time,$4::time,$5,$6,$7,$8,NULLIF($9,'')::date,NULLIF($10,'')::date) RETURNING `+slotCols,
-		sess(c).Group.ID, req.Weekday, req.StartTime, req.EndTime, req.Subject, req.Room, req.Teacher, req.Parity, req.ValidFrom, req.ValidTo))
+		INSERT INTO schedule_slots (group_id, weekday, start_time, end_time, subject, room, teacher, valid_from, valid_to)
+		VALUES ($1,$2,$3::time,$4::time,$5,$6,$7,NULLIF($8,'')::date,NULLIF($9,'')::date) RETURNING `+slotCols,
+		sess(c).Group.ID, req.Weekday, req.StartTime, req.EndTime, req.Subject, req.Room, req.Teacher, req.ValidFrom, req.ValidTo))
 	if err != nil {
 		serverErr(c, err)
 		return
@@ -110,10 +109,10 @@ func (a *app) updateSlot(c *gin.Context) {
 		return
 	}
 	s, err := scanSlot(a.db.QueryRow(c, `
-		UPDATE schedule_slots SET weekday=$3, start_time=$4::time, end_time=$5::time, subject=$6, room=$7, teacher=$8, parity=$9,
-			valid_from=NULLIF($10,'')::date, valid_to=NULLIF($11,'')::date
+		UPDATE schedule_slots SET weekday=$3, start_time=$4::time, end_time=$5::time, subject=$6, room=$7, teacher=$8,
+			valid_from=NULLIF($9,'')::date, valid_to=NULLIF($10,'')::date
 		WHERE id=$1 AND group_id=$2 RETURNING `+slotCols,
-		id, sess(c).Group.ID, req.Weekday, req.StartTime, req.EndTime, req.Subject, req.Room, req.Teacher, req.Parity, req.ValidFrom, req.ValidTo))
+		id, sess(c).Group.ID, req.Weekday, req.StartTime, req.EndTime, req.Subject, req.Room, req.Teacher, req.ValidFrom, req.ValidTo))
 	if err == pgx.ErrNoRows {
 		fail(c, http.StatusNotFound, "slot not found")
 		return
@@ -151,7 +150,7 @@ func (a *app) findLesson(c *gin.Context, s *session, slotID int64, dateStr strin
 		return slot{}, date, false
 	}
 	sl, err := scanSlot(a.db.QueryRow(c, `SELECT `+slotCols+` FROM schedule_slots WHERE id=$1 AND group_id=$2`, slotID, s.Group.ID))
-	if err == pgx.ErrNoRows || (err == nil && !sl.occursOn(s.Group.Week1Monday, date)) {
+	if err == pgx.ErrNoRows || (err == nil && !sl.occursOn(date)) {
 		fail(c, http.StatusNotFound, "lesson not found")
 		return slot{}, date, false
 	} else if err != nil {
@@ -275,7 +274,7 @@ func (a *app) listLessons(c *gin.Context) {
 	now := s.Group.now()
 	out := []lesson{}
 	for _, sl := range all {
-		if !sl.occursOn(s.Group.Week1Monday, date) {
+		if !sl.occursOn(date) {
 			continue
 		}
 		started, open := lessonState(now, date, sl.StartTime)
@@ -512,7 +511,7 @@ func (a *app) stats(c *gin.Context) {
 	for d := from; !d.After(to); d = d.AddDate(0, 0, 1) {
 		for _, sl := range all {
 			key := strconv.FormatInt(sl.ID, 10) + d.Format(dateLayout)
-			if !sl.occursOn(s.Group.Week1Monday, d) || cancelled[key] {
+			if !sl.occursOn(d) || cancelled[key] {
 				continue
 			}
 			if started, open := lessonState(now, d, sl.StartTime); started {
@@ -571,7 +570,7 @@ func (a *app) stats(c *gin.Context) {
 		dateStr = *dateNullable
 		d, _ := parseDate(dateStr)
 		sl, ok := slotByID[*slotID]
-		if !ok || !sl.occursOn(s.Group.Week1Monday, d) || cancelled[strconv.FormatInt(*slotID, 10)+dateStr] {
+		if !ok || !sl.occursOn(d) || cancelled[strconv.FormatInt(*slotID, 10)+dateStr] {
 			continue
 		}
 		if status == "present" {

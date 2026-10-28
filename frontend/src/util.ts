@@ -1,5 +1,4 @@
 export const WEEKDAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
-export const PARITY = ['Каждую неделю', 'Нечётные недели', 'Чётные недели'];
 
 export function fmtDate(d: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
@@ -30,22 +29,10 @@ export function isoWeekday(s: string): number {
 export function mondayOf(s: string): string {
   return addDays(s, 1 - isoWeekday(s));
 }
-/** Mirrors backend isOddWeek: week1Monday is the Monday of an odd week. */
-export function isOddWeek(week1Monday: string, date: string): boolean {
-  const days = Math.round((parseDate(mondayOf(date)).getTime() - parseDate(week1Monday).getTime()) / 86400000);
-  const weeks = Math.floor(days / 7);
-  return ((weeks % 2) + 2) % 2 === 0;
-}
-export function occursOn(
-  slot: { weekday: number; parity: number; valid_from?: string; valid_to?: string },
-  week1Monday: string,
-  date: string,
-): boolean {
+/** Mirrors backend slot.occursOn. */
+export function occursOn(slot: { weekday: number; valid_from?: string; valid_to?: string }, date: string): boolean {
   if (slot.weekday !== isoWeekday(date)) return false;
-  if ((slot.valid_from && date < slot.valid_from) || (slot.valid_to && date > slot.valid_to)) return false;
-  if (slot.parity === 1) return isOddWeek(week1Monday, date);
-  if (slot.parity === 2) return !isOddWeek(week1Monday, date);
-  return true;
+  return !(slot.valid_from && date < slot.valid_from) && !(slot.valid_to && date > slot.valid_to);
 }
 /** Minutes since midnight in the group's timezone. */
 export function nowMinutesIn(tz: string): number {

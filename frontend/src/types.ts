@@ -2,8 +2,6 @@ export interface Group {
   id: number;
   name: string;
   timezone: string;
-  week1_monday: string;
-  current_week: 'odd' | 'even';
 }
 export interface Member {
   user_id: number;
@@ -24,7 +22,6 @@ export interface Slot {
   subject: string;
   room: string;
   teacher: string;
-  parity: 0 | 1 | 2;
   valid_from: string; // YYYY-MM-DD or ''
   valid_to: string;
 }
@@ -72,7 +69,6 @@ export interface ImportLesson {
   teacher_b: string;
   room_a: string;
   room_b: string;
-  parity: 0 | 1 | 2;
   valid_from: string;
   valid_to: string;
   note: string;

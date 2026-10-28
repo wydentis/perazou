@@ -33,10 +33,10 @@ export const hasCredentials = () => Boolean(tg?.initData || dev);
 export const api = {
   me: () => request<Me>('GET', '/me'),
   preview: (code: string) => request<{ name: string }>('GET', `/groups/preview?code=${encodeURIComponent(code)}`),
-  createGroup: (b: { name: string; full_name: string; timezone: string; current_week: string }) => request<void>('POST', '/groups', b),
+  createGroup: (b: { name: string; full_name: string; timezone: string }) => request<void>('POST', '/groups', b),
   join: (b: { code: string; full_name: string }) => request<void>('POST', '/groups/join', b),
   group: () => request<GroupDetails>('GET', '/group'),
-  updateGroup: (b: { name: string; timezone: string; current_week: string }) => request<void>('PATCH', '/group', b),
+  updateGroup: (b: { name: string; timezone: string }) => request<void>('PATCH', '/group', b),
   regenerateInvite: () => request<{ invite_code: string; invite_link: string }>('POST', '/group/invite/regenerate'),
   leave: () => request<void>('POST', '/group/leave'),
   rename: (id: number, full_name: string) => request<void>('PATCH', `/members/${id}`, { full_name }),

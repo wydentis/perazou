@@ -31,7 +31,6 @@ type importLesson struct {
 	TeacherB  string `json:"teacher_b"`
 	RoomA     string `json:"room_a"`
 	RoomB     string `json:"room_b"`
-	Parity    int    `json:"parity"`
 	ValidFrom string `json:"valid_from"`
 	ValidTo   string `json:"valid_to"`
 	// Note keeps annotations (mostly dates) the parser could not turn into structure,
@@ -78,8 +77,7 @@ var (
 	groupHdrRe  = regexp.MustCompile(`(?i)^(\d+)\s*группа`)
 	yearsRe     = regexp.MustCompile(`(20\d\d)\s*/\s*(20\d\d)`)
 	titleRe     = regexp.MustCompile(`(?i)^(профессор|доцент|ассистент|преподаватель|[cс]т(арший)?\.?\s*пр(еподаватель|\.)?)\s+`)
-	parityOdd   = regexp.MustCompile(`(?i)нечетн\S*\s*(нед\S*)?|нечётн\S*\s*(нед\S*)?`)
-	parityEven  = regexp.MustCompile(`(?i)четн\S*\s*(нед\S*)?|чётн\S*\s*(нед\S*)?`)
+	parityRe    = regexp.MustCompile(`(?i)(не)?ч[её]тн\S*\s*(нед\S*)?`)
 	transferRe  = regexp.MustCompile(`(?i)\s*перенос\s.*$`)
 	langAbbr    = map[*regexp.Regexp]string{
 		regexp.MustCompile(`(?i)^англ\.?\s*яз\.?$`): "Английский язык",
@@ -412,7 +410,7 @@ func cleanTeacher(raw string) (string, bool) {
 var segmentRe = regexp.MustCompile(`([^()]+?)\s*(\(\s*\d{1,2}\.\d{1,2}\s*[-–—]\s*\d{1,2}\.\d{1,2}\s*\))`)
 
 // finishLesson interprets the texts of one lesson cell: inline times, validity dates,
-// mid-semester subject switches ("МА с 28.09 - АГ"), parity markers, abbreviations.
+// mid-semester subject switches ("МА с 28.09 - АГ"), abbreviations.
 func finishLesson(l rawLesson, b block, abbr map[string]string, y1, y2 int) []importLesson {
 	date := func(d, m string) string {
 		di, _ := strconv.Atoi(d)
@@ -463,10 +461,10 @@ func finishLesson(l rawLesson, b block, abbr map[string]string, y1, y2 int) []im
 			subject = rangeRe.ReplaceAllString(subject, "")
 		}
 	}
-	if parityOdd.MatchString(subject) {
-		base.Parity, subject = 1, parityOdd.ReplaceAllString(subject, "")
-	} else if parityEven.MatchString(subject) {
-		base.Parity, subject = 2, parityEven.ReplaceAllString(subject, "")
+	// Odd/even weeks are not supported: such a lesson is imported as weekly and flagged.
+	if m := parityRe.FindString(subject); m != "" {
+		notes = append(notes, "в расписании: "+strings.TrimSpace(m)+" — импортируется как еженедельная")
+		subject = parityRe.ReplaceAllString(subject, "")
 	}
 	for _, n := range l.roomNotes {
 		if m := fromRe.FindStringSubmatch(n); m != nil && base.ValidFrom == "" {
