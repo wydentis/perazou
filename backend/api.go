@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/big"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -120,7 +121,8 @@ func fail(c *gin.Context, status int, msg string) {
 func (a *app) authMiddleware(c *gin.Context) {
 	var u *tgUser
 	if a.cfg.DevAuth {
-		if h := c.GetHeader("X-Dev-User"); h != "" { // "id:Name"
+		// "id:Name", percent-encoded by the client so names may be Cyrillic.
+		if h, err := url.PathUnescape(c.GetHeader("X-Dev-User")); err == nil && h != "" {
 			id, name, _ := strings.Cut(h, ":")
 			uid, err := strconv.ParseInt(id, 10, 64)
 			if err == nil {

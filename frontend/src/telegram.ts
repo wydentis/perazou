@@ -24,7 +24,7 @@ export const tg: TgWebApp | undefined = (window as unknown as { Telegram?: { Web
 function applyTheme() {
   const dark = tg?.colorScheme ? tg.colorScheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  const bg = dark ? '#0b0b10' : '#f3f2f8';
+  const bg = dark ? '#0b0b0c' : '#f4f4f0';
   tg?.setHeaderColor?.(bg);
   tg?.setBackgroundColor?.(bg);
   tg?.setBottomBarColor?.(bg);

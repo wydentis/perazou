@@ -42,8 +42,8 @@ export default function Onboarding({ me, initialCode, onDone }: { me: Me; initia
   return (
     <div className="onboarding">
       <div className="hero-art">
-        <div className="blob b1" /><div className="blob b2" /><div className="blob b3" />
-        <div className="logo big">✓</div>
+        <div className="logo big"><Icon name="check" size={44} strokeWidth={3} /></div>
+        <div className="ticker" aria-hidden><span>БЫЛ · НЕ БЫЛ · БЫЛ · НЕ БЫЛ · БЫЛ · НЕ БЫЛ · БЫЛ · НЕ БЫЛ ·&nbsp;</span><span>БЫЛ · НЕ БЫЛ · БЫЛ · НЕ БЫЛ · БЫЛ · НЕ БЫЛ · БЫЛ · НЕ БЫЛ ·&nbsp;</span></div>
       </div>
       <div className="page">
         <h1 className="display">Привет,<br />{me.user.first_name}</h1>

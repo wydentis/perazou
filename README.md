@@ -26,9 +26,9 @@ Go (Gin, pgx) · PostgreSQL 16 · React + TypeScript (Vite) · Caddy (HTTPS) · 
 ## Разработка
 ```bash
 docker run -d --name att-pg -e POSTGRES_PASSWORD=pg -e POSTGRES_DB=att -p 5432:5432 postgres:16-alpine
-# API; DEV_AUTH принимает заголовок X-Dev-User: "<id>:<имя>" вместо подписи Telegram (только локально!)
+# API; DEV_AUTH принимает заголовок X-Dev-User: "<id>:<имя>" (percent-encoded) вместо подписи Telegram (только локально!)
 cd backend && DATABASE_URL='postgres://postgres:pg@localhost:5432/att?sslmode=disable' DEV_AUTH=true go run .
-# Фронт: http://localhost:5173/?dev=1:Староста
+# Фронт: http://localhost:5173/?dev=1:Иван — id пользователя и имя
 cd frontend && npm i && npm run dev
 ```
 Тесты: `cd backend && go test ./...`

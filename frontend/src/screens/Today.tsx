@@ -138,7 +138,7 @@ export default function Today({ me }: { me: Me }) {
                   <div className="lesson-tools">
                     {l.started && !l.cancelled && (
                       <button className="btn ghost sm" onClick={() => setExpanded(expanded === l.id ? null : l.id)}>
-                        <Icon name="users" size={16} /> {expanded === l.id ? 'Скрыть' : 'Отметить группу'}
+                        <Icon name="users" size={16} /> {expanded === l.id ? 'Скрыть' : 'Список'}
                       </button>
                     )}
                     <button className="btn ghost sm" onClick={() => toggleCancel(l)}>

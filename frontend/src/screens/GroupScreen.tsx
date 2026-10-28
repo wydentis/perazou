@@ -60,14 +60,13 @@ export default function GroupScreen({ me, onChanged }: { me: Me; onChanged: () =
       {isHeadman && (
         d?.invite_code ? (
           <div className="invite-card">
-            <div className="blob b1" /><div className="blob b2" />
             <div className="invite-k">Код приглашения</div>
             <div className="invite-code">{d.invite_code}</div>
             {d.invite_link ? (
               <div className="invite-actions">
-                <button className="btn light" onClick={share}><Icon name="share" size={18} /> Поделиться</button>
-                <button className="btn glass" onClick={copy} aria-label="Скопировать"><Icon name="copy" size={18} /></button>
-                <button className="btn glass" aria-label="Сменить код" onClick={run(async () => {
+                <button className="btn ink" onClick={share}><Icon name="share" size={18} /> Поделиться</button>
+                <button className="btn square" onClick={copy} aria-label="Скопировать"><Icon name="copy" size={18} /></button>
+                <button className="btn square" aria-label="Сменить код" onClick={run(async () => {
                   if (await confirmDialog('Старая ссылка перестанет работать. Продолжить?')) await api.regenerateInvite();
                 })}><Icon name="refresh" size={18} /></button>
               </div>

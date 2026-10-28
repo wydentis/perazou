@@ -63,8 +63,7 @@ export default function App() {
 function Splash({ text, loading }: { text?: string; loading?: boolean }) {
   return (
     <div className="splash">
-      <div className="blob b1" /><div className="blob b2" />
-      <div className="logo">✓</div>
+      <div className="logo"><Icon name="check" size={34} strokeWidth={3} /></div>
       {loading ? <div className="dots"><i /><i /><i /></div> : <p>{text}</p>}
     </div>
   );

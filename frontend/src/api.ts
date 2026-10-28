@@ -13,7 +13,7 @@ const dev = new URLSearchParams(location.search).get('dev');
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (tg?.initData) headers.Authorization = 'tma ' + tg.initData;
-  else if (dev) headers['X-Dev-User'] = dev;
+  else if (dev) headers['X-Dev-User'] = encodeURIComponent(dev); // headers must be ASCII
   const res = await fetch('/api' + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!res.ok) {
     let msg = res.statusText;

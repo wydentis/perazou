@@ -1,14 +1,15 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './icons';
 
-const HUES = [262, 210, 330, 160, 28, 190, 290, 120];
+// Flat pastel swatches; the initials stay dark on every one of them.
+const SWATCHES = ['#d7ff3d', '#b9a8ff', '#ffb4a2', '#9fe8d0', '#ffd66b', '#a8d8ff', '#ff9ed2', '#c9c9c9'];
 
 export function Avatar({ name, id, size = 40 }: { name: string; id: number; size?: number }) {
   const initials = name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
-  const h = HUES[Math.abs(id) % HUES.length];
+
   return (
     <div className="avatar" style={{ width: size, height: size, fontSize: size * 0.36,
-      background: `linear-gradient(135deg, hsl(${h} 85% 64%), hsl(${h + 40} 80% 52%))` }}>
+      background: SWATCHES[Math.abs(id) % SWATCHES.length] }}>
       {initials || '?'}
     </div>
   );
