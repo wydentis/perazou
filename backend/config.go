@@ -15,12 +15,14 @@ type config struct {
 	AppShort    string // optional Mini App short name (for t.me/bot/app?startapp=)
 	DevAuth     bool   // accept X-Dev-User header instead of Telegram initData (local only)
 	StaticDir   string // built Mini App to serve alongside the API (single-service deploys)
+	BotPolling  bool   // BOT_MODE=polling: long polling for local runs without public HTTPS
 }
 
 func loadConfig() (config, error) {
 	c := config{
 		Addr:        listenAddr(),
 		StaticDir:   os.Getenv("STATIC_DIR"),
+		BotPolling:  os.Getenv("BOT_MODE") == "polling",
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 		BotToken:    os.Getenv("BOT_TOKEN"),
 		WebAppURL:   strings.TrimRight(os.Getenv("WEBAPP_URL"), "/"),
@@ -33,6 +35,9 @@ func loadConfig() (config, error) {
 	}
 	if c.BotToken == "" && !c.DevAuth {
 		return c, fmt.Errorf("BOT_TOKEN is required")
+	}
+	if c.BotToken != "" && !c.BotPolling && !strings.HasPrefix(c.WebAppURL, "https://") {
+		return c, fmt.Errorf("WEBAPP_URL must be an https URL for the Telegram webhook (or set BOT_MODE=polling)")
 	}
 	return c, nil
 }

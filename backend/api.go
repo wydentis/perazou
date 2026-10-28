@@ -20,6 +20,7 @@ import (
 type app struct {
 	db  *pgxpool.Pool
 	cfg config
+	bot *bot // nil when BOT_TOKEN is not set
 }
 
 type groupInfo struct {
@@ -86,6 +87,9 @@ func newRouter(a *app) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery(), gin.Logger())
 	r.GET("/healthz", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
+	if a.bot != nil && !a.cfg.BotPolling {
+		r.POST(webhookPath, a.bot.webhook)
+	}
 	if a.cfg.StaticDir != "" {
 		r.NoRoute(spaHandler(a.cfg.StaticDir))
 	}

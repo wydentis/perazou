@@ -29,11 +29,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	a := &app{db: pool, cfg: cfg}
 	if cfg.BotToken != "" {
-		go newBot(cfg.BotToken, cfg.WebAppURL).run(ctx)
+		a.bot = newBot(cfg.BotToken, cfg.WebAppURL)
 	}
-
-	srv := &http.Server{Addr: cfg.Addr, Handler: newRouter(&app{db: pool, cfg: cfg}), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: cfg.Addr, Handler: newRouter(a), ReadHeaderTimeout: 10 * time.Second}
+	if a.bot != nil {
+		// Registered after the router exists, so the webhook endpoint is live when Telegram calls it.
+		go a.bot.run(ctx, cfg.BotPolling)
+	}
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

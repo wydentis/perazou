@@ -4,6 +4,10 @@
 отмечают себя «был / не был» на парах. Староста отмечает себя так же, а ещё видит сводку, правит чужие отметки,
 отменяет пары и редактирует расписание. Весь функционал — внутри Mini App; бот только открывает его (`/start`, кнопка меню).
 
+Бот получает обновления по вебхуку: при старте сервер сам вызывает `setWebhook` на `WEBAPP_URL/telegram/webhook`
+с секретным заголовком (выводится из токена), поэтому реплик может быть сколько угодно. Для локального запуска
+без публичного HTTPS есть `BOT_MODE=polling`.
+
 ## Правила
 - Расписание задаётся заранее: день недели, время, предмет, аудитория, повторение (каждую / нечётные / чётные недели).
 - Студент отмечается в первые 15 минут пары (в часовом поясе группы) и может менять отметку, пока окно открыто.
@@ -43,7 +47,8 @@ Go (Gin, pgx) · PostgreSQL 16 · React + TypeScript (Vite) · Caddy (HTTPS) · 
    - `MINIAPP_SHORT_NAME` — только если Mini App именованное (см. ниже)
 4. Settings → Networking → Custom Domain → `perazou.wydentis.xyz`; у регистратора домена добавьте
    записи, которые покажет Railway (CNAME на `*.up.railway.app`, при необходимости TXT для проверки).
-5. Держите 1 реплику: бот работает через long polling, два экземпляра будут конфликтовать.
+5. После деплоя в Deploy Logs должна появиться строка `bot: webhook registered at …`. Пока домен или
+   сертификат не готовы, сервер повторяет регистрацию с нарастающей паузой — это нормально.
 
 ### Свой сервер (docker compose)
 `cp .env.example .env`, заполните, `docker compose up -d --build`. Caddy получает HTTPS-сертификат
@@ -57,6 +62,7 @@ Go (Gin, pgx) · PostgreSQL 16 · React + TypeScript (Vite) · Caddy (HTTPS) · 
 ```bash
 docker run -d --name att-pg -e POSTGRES_PASSWORD=pg -e POSTGRES_DB=att -p 5432:5432 postgres:16-alpine
 # API; DEV_AUTH принимает заголовок X-Dev-User: "<id>:<имя>" (percent-encoded) вместо подписи Telegram (только локально!)
+# с настоящим ботом добавьте BOT_TOKEN=… BOT_MODE=polling WEBAPP_URL=… (вебхуку нужен публичный HTTPS)
 cd backend && DATABASE_URL='postgres://postgres:pg@localhost:5432/att?sslmode=disable' DEV_AUTH=true go run .
 # Фронт: http://localhost:5173/?dev=1:Иван — id пользователя и имя
 cd frontend && npm i && npm run dev
