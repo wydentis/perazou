@@ -13,8 +13,10 @@ const uniqJoin = (xs: string[]) => [...new Set(xs.filter(Boolean))].join(' / ');
 /** Turns a parsed lesson into a slot for the chosen subgroup, or null if it is not theirs. */
 function toSlot(l: ImportLesson, sub: Sub): Omit<Slot, 'id'> | null {
   if (sub && l.sub && l.sub !== sub) return null;
-  const teacher = sub === 'А' ? l.teacher_a : sub === 'Б' ? l.teacher_b : uniqJoin([l.teacher_a, l.teacher_b]);
-  const room = sub === 'А' ? l.room_a : sub === 'Б' ? l.room_b : uniqJoin([l.room_a, l.room_b]);
+  // A lesson for one subgroup uses that subgroup's teacher and room, whatever the view.
+  const side = l.sub || sub;
+  const teacher = side === 'А' ? l.teacher_a : side === 'Б' ? l.teacher_b : uniqJoin([l.teacher_a, l.teacher_b]);
+  const room = side === 'А' ? l.room_a : side === 'Б' ? l.room_b : uniqJoin([l.room_a, l.room_b]);
   return {
     weekday: l.weekday, start_time: l.start_time, end_time: l.end_time,
     subject: !sub && l.sub ? `${l.subject} (подгр. ${l.sub})` : l.subject,
@@ -66,7 +68,7 @@ export default function ImportScreen({ groupName, onClose }: { groupName: string
     try {
       const r = await api.importApply(selected.map((x) => x.slot), replace);
       haptic.ok();
-      toast(`Добавлено ${r.created} ${plural(r.created, 'пара', 'пары', 'пар')}` + (r.skipped ? `, ${r.skipped} уже были` : ''), 'ok');
+      toast(`Добавлено ${r.created} ${plural(r.created, 'пара', 'пары', 'пар')}` + (r.skipped ? `, ${r.skipped} обновлено` : ''), 'ok');
       onClose();
     } catch (e) {
       haptic.err();

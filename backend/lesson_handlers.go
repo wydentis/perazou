@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"time"
 
@@ -190,8 +191,10 @@ func (a *app) listLessons(c *gin.Context) {
 		serverErr(c, err)
 		return
 	}
+	// Members who joined after this date were not expected at its lessons.
 	var total int
-	if err := a.db.QueryRow(c, `SELECT count(*) FROM members WHERE group_id=$1`, s.Group.ID).Scan(&total); err != nil {
+	if err := a.db.QueryRow(c, `SELECT count(*) FROM members WHERE group_id=$1 AND (joined_at AT TIME ZONE $3)::date <= $2::date`,
+		s.Group.ID, dateStr, s.Group.Timezone).Scan(&total); err != nil {
 		serverErr(c, err)
 		return
 	}
@@ -231,6 +234,10 @@ func (a *app) listLessons(c *gin.Context) {
 		}
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		serverErr(c, err)
+		return
+	}
 	cancelled := map[int64]bool{}
 	crows, err := a.db.Query(c, `
 		SELECT lc.slot_id FROM lesson_cancellations lc JOIN schedule_slots ss ON ss.id = lc.slot_id
@@ -249,6 +256,10 @@ func (a *app) listLessons(c *gin.Context) {
 		cancelled[id] = true
 	}
 	crows.Close()
+	if err := crows.Err(); err != nil {
+		serverErr(c, err)
+		return
+	}
 
 	now := s.Group.now()
 	out := []lesson{}
@@ -300,6 +311,10 @@ func (a *app) lessonAttendance(c *gin.Context) {
 			return
 		}
 		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		serverErr(c, err)
+		return
 	}
 	c.JSON(http.StatusOK, out)
 }
@@ -450,27 +465,37 @@ func (a *app) stats(c *gin.Context) {
 		cancelled[strconv.FormatInt(id, 10)+d] = true
 	}
 	crows.Close()
+	if err := crows.Err(); err != nil {
+		serverErr(c, err)
+		return
+	}
 
-	total := 0
+	// One entry per lesson that took place, in date order; a member's total counts only
+	// the lessons since the day they joined.
+	var lessonDates []string
 	for d := from; !d.After(to); d = d.AddDate(0, 0, 1) {
 		for _, sl := range all {
 			if !sl.occursOn(s.Group.Week1Monday, d) || cancelled[strconv.FormatInt(sl.ID, 10)+d.Format(dateLayout)] {
 				continue
 			}
 			if started, _ := lessonState(now, d, sl.StartTime); started {
-				total++
+				lessonDates = append(lessonDates, d.Format(dateLayout))
 			}
 		}
+	}
+	lessonsSince := func(joined string) int {
+		return len(lessonDates) - sort.SearchStrings(lessonDates, joined)
 	}
 
 	// Marks can only exist for lessons that occurred, but a deleted-then-recreated schedule may
 	// leave marks on days that no longer match; they are ignored by re-checking per slot/date.
 	rows, err := a.db.Query(c, `
-		SELECT m.user_id, m.full_name, a.slot_id, to_char(a.lesson_date,'YYYY-MM-DD'), COALESCE(a.status,'')
+		SELECT m.user_id, m.full_name, to_char(m.joined_at AT TIME ZONE $6, 'YYYY-MM-DD'),
+			a.slot_id, to_char(a.lesson_date,'YYYY-MM-DD'), COALESCE(a.status,'')
 		FROM members m
 		LEFT JOIN attendance a ON a.user_id = m.user_id AND a.lesson_date BETWEEN $2::date AND $3::date
 		WHERE m.group_id=$1 AND ($4 OR m.user_id=$5)
-		ORDER BY m.full_name, m.user_id`, s.Group.ID, from, to, s.Role == "headman", s.UserID)
+		ORDER BY m.full_name, m.user_id`, s.Group.ID, from, to, s.Role == "headman", s.UserID, s.Group.Timezone)
 	if err != nil {
 		serverErr(c, err)
 		return
@@ -482,12 +507,13 @@ func (a *app) stats(c *gin.Context) {
 	}
 	out := []statRow{}
 	idx := map[int64]int{}
+	joinedAt := map[int64]string{}
 	for rows.Next() {
 		var uid int64
-		var name, dateStr, status string
+		var name, joined, dateStr, status string
 		var slotID *int64
 		var dateNullable *string
-		if err := rows.Scan(&uid, &name, &slotID, &dateNullable, &status); err != nil {
+		if err := rows.Scan(&uid, &name, &joined, &slotID, &dateNullable, &status); err != nil {
 			serverErr(c, err)
 			return
 		}
@@ -495,9 +521,10 @@ func (a *app) stats(c *gin.Context) {
 		if !seen {
 			i = len(out)
 			idx[uid] = i
-			out = append(out, statRow{UserID: uid, FullName: name, Total: total})
+			joinedAt[uid] = joined
+			out = append(out, statRow{UserID: uid, FullName: name, Total: lessonsSince(joined)})
 		}
-		if slotID == nil || dateNullable == nil {
+		if slotID == nil || dateNullable == nil || *dateNullable < joinedAt[uid] {
 			continue
 		}
 		dateStr = *dateNullable
@@ -512,11 +539,15 @@ func (a *app) stats(c *gin.Context) {
 			out[i].Absent++
 		}
 	}
+	if err := rows.Err(); err != nil {
+		serverErr(c, err)
+		return
+	}
 	for i := range out {
 		out[i].Unmarked = out[i].Total - out[i].Present - out[i].Absent
 		if out[i].Unmarked < 0 {
 			out[i].Unmarked = 0
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"from": from.Format(dateLayout), "to": to.Format(dateLayout), "lessons": total, "rows": out})
+	c.JSON(http.StatusOK, gin.H{"from": from.Format(dateLayout), "to": to.Format(dateLayout), "lessons": len(lessonDates), "rows": out})
 }

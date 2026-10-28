@@ -424,7 +424,11 @@ func finishLesson(l rawLesson, b block, abbr map[string]string, y1, y2 int) []im
 		if mi >= 8 {
 			y = y1
 		}
-		return fmt.Sprintf("%04d-%02d-%02d", y, mi, di)
+		s := fmt.Sprintf("%04d-%02d-%02d", y, mi, di)
+		if _, err := time.Parse(dateLayout, s); err != nil { // e.g. 31.09
+			return ""
+		}
+		return s
 	}
 	// "Аналитическая геометрия (01.09 - 24.10) Основы высшей алгебры (26.10 - 31.12)":
 	// several consecutive courses in one cell, each with its own period.
@@ -447,7 +451,8 @@ func finishLesson(l rawLesson, b block, abbr map[string]string, y1, y2 int) []im
 	// so that date ranges like "(01.09 - 11.10)" are not mistaken for times.
 	if m := inlineTime.FindStringSubmatch(subject); m != nil {
 		st, en := hhmm(m[1], m[2]), hhmm(m[3], m[4])
-		if abs(clockMinutes(st)-clockMinutes(b.start)) <= 60 && clockMinutes(en) > clockMinutes(st) {
+		// A real lesson lasts 30 minutes to 4 hours; "(09.09 - 18.10)" read as 09:09-18:10 does not.
+		if dur := clockMinutes(en) - clockMinutes(st); abs(clockMinutes(st)-clockMinutes(b.start)) <= 60 && dur >= 30 && dur <= 240 {
 			base.StartTime, base.EndTime = st, en
 			subject = inlineTime.ReplaceAllString(subject, "")
 		}

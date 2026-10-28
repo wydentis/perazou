@@ -30,7 +30,8 @@ func (b *bot) call(ctx context.Context, method string, payload any, out any) err
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := b.http.Do(req)
 	if err != nil {
-		return err
+		// *url.Error embeds the request URL, which contains the bot token.
+		return fmt.Errorf("telegram %s: %s", method, strings.ReplaceAll(err.Error(), b.token, "<token>"))
 	}
 	defer resp.Body.Close()
 	var r struct {

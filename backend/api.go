@@ -392,6 +392,10 @@ func (a *app) getGroup(c *gin.Context) {
 		}
 		members = append(members, m)
 	}
+	if err := rows.Err(); err != nil {
+		serverErr(c, err)
+		return
+	}
 	out := gin.H{"group": s.Group.info(), "members": members}
 	if s.Role == "headman" {
 		out["invite_code"] = s.Group.Code
@@ -416,9 +420,16 @@ func (a *app) updateGroup(c *gin.Context) {
 		fail(c, http.StatusBadRequest, "invalid name, timezone or current_week")
 		return
 	}
-	// Re-anchor using the *new* timezone so "current week" is evaluated where the group lives.
+	// Re-anchor only if the requested parity differs from the current one (evaluated in the
+	// new timezone); otherwise a stale form submitted across a week boundary would flip it.
+	anchor := s.Group.Week1Monday
+	moved := s.Group
+	moved.Timezone = req.Timezone
+	if isOddWeek(anchor, moved.now()) != (req.CurrentWeek == "odd") {
+		anchor = weekAnchor(loc, req.CurrentWeek == "odd")
+	}
 	if _, err := a.db.Exec(c, `UPDATE groups SET name=$2, timezone=$3, week1_monday=$4 WHERE id=$1`,
-		s.Group.ID, req.Name, req.Timezone, weekAnchor(loc, req.CurrentWeek == "odd")); err != nil {
+		s.Group.ID, req.Name, req.Timezone, anchor); err != nil {
 		serverErr(c, err)
 		return
 	}

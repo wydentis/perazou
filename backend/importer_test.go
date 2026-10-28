@@ -121,3 +121,18 @@ func TestFinishLessonPatterns(t *testing.T) {
 		t.Errorf("complex teacher should stay verbatim and be flagged: %q %v", got, ok)
 	}
 }
+
+func TestReviewRegressions(t *testing.T) {
+	b := block{weekday: 2, start: "09:50", end: "11:15"}
+	run := func(subject string) []importLesson {
+		return finishLesson(rawLesson{subject: subject}, b, map[string]string{}, 2026, 2027)
+	}
+	// A date range near the block start must not be read as a 9-hour lesson time.
+	if ls := run("Аналитическая геометрия (09.09 - 18.10)"); ls[0].StartTime != "09:50" || ls[0].ValidFrom != "2026-09-09" || ls[0].ValidTo != "2026-10-18" {
+		t.Errorf("date range taken as time: %+v", ls[0])
+	}
+	// Impossible dates are ignored instead of producing invalid slot dates.
+	if ls := run("Физика (01.09 - 31.09)"); ls[0].ValidTo != "" {
+		t.Errorf("impossible date accepted: %+v", ls[0])
+	}
+}

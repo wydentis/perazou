@@ -103,8 +103,9 @@ func (a *app) parseImport(c *gin.Context) {
 }
 
 // applyImport inserts the previewed slots. With replace=true the current schedule (and,
-// through ON DELETE CASCADE, its attendance history) is removed first. Slots identical to
-// existing ones are skipped so that re-importing is harmless.
+// through ON DELETE CASCADE, its attendance history) is removed first. A slot that already
+// exists (same day, time, subject, parity and period) only gets its room and teacher
+// refreshed, so re-importing an updated timetable is harmless.
 func (a *app) applyImport(c *gin.Context) {
 	s := sess(c)
 	var req struct {
@@ -138,19 +139,25 @@ func (a *app) applyImport(c *gin.Context) {
 	}
 	created := 0
 	for _, r := range req.Slots {
+		args := []any{s.Group.ID, r.Weekday, r.StartTime, r.EndTime, r.Subject, r.Room, r.Teacher, r.Parity, r.ValidFrom, r.ValidTo}
 		tag, err := tx.Exec(c, `
-			INSERT INTO schedule_slots (group_id, weekday, start_time, end_time, subject, room, teacher, parity, valid_from, valid_to)
-			SELECT $1,$2,$3::time,$4::time,$5,$6,$7,$8,NULLIF($9,'')::date,NULLIF($10,'')::date
-			WHERE NOT EXISTS (
-				SELECT 1 FROM schedule_slots WHERE group_id=$1 AND weekday=$2 AND start_time=$3::time AND end_time=$4::time
-				AND subject=$5 AND parity=$8 AND valid_from IS NOT DISTINCT FROM NULLIF($9,'')::date
-				AND valid_to IS NOT DISTINCT FROM NULLIF($10,'')::date)`,
-			s.Group.ID, r.Weekday, r.StartTime, r.EndTime, r.Subject, r.Room, r.Teacher, r.Parity, r.ValidFrom, r.ValidTo)
+			UPDATE schedule_slots SET room=$6, teacher=$7
+			WHERE group_id=$1 AND weekday=$2 AND start_time=$3::time AND end_time=$4::time AND subject=$5 AND parity=$8
+				AND valid_from IS NOT DISTINCT FROM NULLIF($9,'')::date AND valid_to IS NOT DISTINCT FROM NULLIF($10,'')::date`, args...)
 		if err != nil {
 			serverErr(c, err)
 			return
 		}
-		created += int(tag.RowsAffected())
+		if tag.RowsAffected() > 0 {
+			continue
+		}
+		if _, err := tx.Exec(c, `
+			INSERT INTO schedule_slots (group_id, weekday, start_time, end_time, subject, room, teacher, parity, valid_from, valid_to)
+			VALUES ($1,$2,$3::time,$4::time,$5,$6,$7,$8,NULLIF($9,'')::date,NULLIF($10,'')::date)`, args...); err != nil {
+			serverErr(c, err)
+			return
+		}
+		created++
 	}
 	if err := tx.Commit(c); err != nil {
 		serverErr(c, err)
