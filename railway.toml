@@ -1,0 +1,4 @@
+# Railway picks up the root Dockerfile automatically.
+[deploy]
+healthcheckPath = "/healthz"
+restartPolicyType = "ON_FAILURE"

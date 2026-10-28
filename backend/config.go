@@ -14,11 +14,13 @@ type config struct {
 	BotUsername string // without @, used to build invite links
 	AppShort    string // optional Mini App short name (for t.me/bot/app?startapp=)
 	DevAuth     bool   // accept X-Dev-User header instead of Telegram initData (local only)
+	StaticDir   string // built Mini App to serve alongside the API (single-service deploys)
 }
 
 func loadConfig() (config, error) {
 	c := config{
-		Addr:        envOr("ADDR", ":8080"),
+		Addr:        listenAddr(),
+		StaticDir:   os.Getenv("STATIC_DIR"),
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 		BotToken:    os.Getenv("BOT_TOKEN"),
 		WebAppURL:   strings.TrimRight(os.Getenv("WEBAPP_URL"), "/"),
@@ -33,6 +35,14 @@ func loadConfig() (config, error) {
 		return c, fmt.Errorf("BOT_TOKEN is required")
 	}
 	return c, nil
+}
+
+// listenAddr honours PORT, which platforms such as Railway inject, then ADDR.
+func listenAddr() string {
+	if p := os.Getenv("PORT"); p != "" {
+		return ":" + p
+	}
+	return envOr("ADDR", ":8080")
 }
 
 func envOr(k, def string) string {

@@ -15,7 +15,7 @@ services:
       retries: 10
 
   api:
-    build: ./backend
+    build: .
     restart: unless-stopped
     depends_on:
       db:
@@ -28,7 +28,7 @@ services:
       WEBAPP_URL: https://${DOMAIN:?set DOMAIN in .env}
 
   web:
-    build: ./frontend
+    image: caddy:2-alpine
     restart: unless-stopped
     depends_on:
       - api
@@ -38,6 +38,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
 
 volumes:

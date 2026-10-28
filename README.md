@@ -28,14 +28,30 @@
 ## Стек
 Go (Gin, pgx) · PostgreSQL 16 · React + TypeScript (Vite) · Caddy (HTTPS) · Docker Compose.
 
-## Запуск
-1. Создайте бота в @BotFather, получите токен. Там же: `/newapp` (или Bot Settings → Configure Mini App) →
-   URL `https://<DOMAIN>`. Если это *Main Mini App*, ссылка приглашения — `t.me/<bot>?startapp=CODE`;
-   если именованное приложение — укажите `MINIAPP_SHORT_NAME`.
-2. `cp .env.example .env` и заполните.
-3. `docker compose up -d --build`. Порты 80/443 должны быть открыты, DNS `DOMAIN` — на этот хост.
+## Деплой
+Один образ (`Dockerfile` в корне): Go-сервер отдаёт и API, и собранный Mini App. Миграции применяются при старте.
 
-Миграции применяются автоматически при старте API.
+### Railway
+1. New Project → Deploy from GitHub repo → этот репозиторий (ветка `master`). Корневой `Dockerfile`
+   и `railway.toml` (healthcheck `/healthz`) подхватятся сами.
+2. В проект: + New → Database → PostgreSQL.
+3. Variables сервиса приложения:
+   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`
+   - `BOT_TOKEN` — токен из @BotFather
+   - `BOT_USERNAME` — username бота без @
+   - `WEBAPP_URL` = `https://perazou.wydentis.xyz`
+   - `MINIAPP_SHORT_NAME` — только если Mini App именованное (см. ниже)
+4. Settings → Networking → Custom Domain → `perazou.wydentis.xyz`; у регистратора домена добавьте
+   записи, которые покажет Railway (CNAME на `*.up.railway.app`, при необходимости TXT для проверки).
+5. Держите 1 реплику: бот работает через long polling, два экземпляра будут конфликтовать.
+
+### Свой сервер (docker compose)
+`cp .env.example .env`, заполните, `docker compose up -d --build`. Caddy получает HTTPS-сертификат
+для `DOMAIN` (DNS должен указывать на сервер, порты 80/443 свободны).
+
+### @BotFather
+`/newapp` или Bot Settings → Configure Mini App → URL `https://<домен>`. Если это *Main Mini App*,
+ссылка приглашения — `t.me/<bot>?startapp=CODE`; если именованное приложение — укажите `MINIAPP_SHORT_NAME`.
 
 ## Разработка
 ```bash
