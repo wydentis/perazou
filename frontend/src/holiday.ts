@@ -5,7 +5,7 @@ import { fmtDate } from './util';
  * [from, to] inclusive and needs no deploy to turn off. `?theme=<name>` previews one
  * outside its dates.
  */
-const HOLIDAYS = [{ name: 'halloween', from: '2026-11-03', to: '2026-11-03' }] as const;
+const HOLIDAYS = [{ name: 'halloween', from: '2026-11-02', to: '2026-11-03' }] as const;
 
 export type Holiday = (typeof HOLIDAYS)[number]['name'];
 
