@@ -1,9 +1,12 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './icons';
+import { holiday } from './holiday';
 import { tg } from './telegram';
 
 // Flat pastel swatches; the initials stay dark on every one of them.
-const SWATCHES = ['#d7ff3d', '#b9a8ff', '#ffb4a2', '#9fe8d0', '#ffd66b', '#a8d8ff', '#ff9ed2', '#c9c9c9'];
+const SWATCHES = holiday === 'halloween'
+  ? ['#ff7a1a', '#b48cff', '#9be36d', '#ffb347', '#e05a47', '#d9c7ff', '#f2e6c9', '#8f8a99']
+  : ['#d7ff3d', '#b9a8ff', '#ffb4a2', '#9fe8d0', '#ffd66b', '#a8d8ff', '#ff9ed2', '#c9c9c9'];
 
 export function Avatar({ name, id, size = 40 }: { name: string; id: number; size?: number }) {
   const initials = name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
@@ -101,5 +104,31 @@ export function Footer() {
       Автор — Kiryl Sapeha · tg:{' '}
       <a href={url} onClick={(e) => { if (tg) { e.preventDefault(); tg.openTelegramLink(url); } }}>@{AUTHOR_TG}</a>
     </footer>
+  );
+}
+
+/** Night sky decoration for the Halloween theme: a few bats drifting near the top. */
+export function HalloweenSky() {
+  if (holiday !== 'halloween') return null;
+  const bat = 'M12 7c-1.2-2-3.4-3-5.5-2.6.9.7 1.3 1.6 1.2 2.6C6 6.2 3.5 6.6 2 8.4c1.6-.2 2.9.5 3.5 1.6-1.5.4-2.6 1.4-3 2.8 1.6-.9 3.5-.8 4.9.3.8-1.3 2.4-2.1 4.6-2.1s3.8.8 4.6 2.1c1.4-1.1 3.3-1.2 4.9-.3-.4-1.4-1.5-2.4-3-2.8.6-1.1 1.9-1.8 3.5-1.6-1.5-1.8-4-2.2-5.7-1.4-.1-1 .3-1.9 1.2-2.6C15.4 4 13.2 5 12 7Z';
+  return (
+    <div className="hw-sky" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <svg key={i} className={`hw-bat b${i}`} viewBox="0 0 24 16"><path d={bat} /></svg>
+      ))}
+    </div>
+  );
+}
+
+export function HalloweenBanner() {
+  if (holiday !== 'halloween') return null;
+  return (
+    <div className="hw-banner">
+      <span className="hw-pumpkin" aria-hidden>🎃</span>
+      <div>
+        <b>Хэллоуин на парах</b>
+        <span>Отметься на паре — а то придут за тобой 👻</span>
+      </div>
+    </div>
   );
 }

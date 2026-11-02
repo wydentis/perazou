@@ -3,7 +3,7 @@ import { api, hasCredentials } from './api';
 import type { Me } from './types';
 import { ensureWriteAccess, haptic, inviteCodeFromLaunch } from './telegram';
 import { Icon, type IconName } from './icons';
-import { Footer, humanError, useToast } from './ui';
+import { Footer, HalloweenSky, humanError, useToast } from './ui';
 import Onboarding from './screens/Onboarding';
 import Today from './screens/Today';
 import Schedule from './screens/Schedule';
@@ -57,6 +57,7 @@ export default function App() {
   const isHeadman = me.member.role === 'headman';
   return (
     <div className="app">
+      <HalloweenSky />
       <main key={tab} className="screen">
         {tab === 'today' && <Today me={me} />}
         {tab === 'schedule' && <Schedule group={me.group} isHeadman={isHeadman} />}

@@ -4,7 +4,7 @@ import type { AttendanceRow, Lesson, Me, Slot } from '../types';
 import { addDays, mondayOf, nowMinutesIn, occursOn, parseDate, plural, todayIn, toMinutes, WEEKDAYS_SHORT } from '../util';
 import { haptic } from '../telegram';
 import { Icon } from '../icons';
-import { Avatar, Empty, Skeleton, humanError, useToast } from '../ui';
+import { Avatar, Empty, HalloweenBanner, Skeleton, humanError, useToast } from '../ui';
 
 export default function Today({ me }: { me: Me }) {
   const group = me.group!;
@@ -85,6 +85,8 @@ export default function Today({ me }: { me: Me }) {
         </div>
         {date !== today && <button className="chip" onClick={() => setDate(today)}>Сегодня</button>}
       </header>
+
+      <HalloweenBanner />
 
       <div className="weekstrip">
         <button className="icon-btn" onClick={() => setDate(addDays(date, -7))} aria-label="Предыдущая неделя"><Icon name="left" /></button>

@@ -1,3 +1,5 @@
+import { holiday } from './holiday';
+
 // Minimal typings for the parts of Telegram.WebApp we use.
 interface TgWebApp {
   initData: string;
@@ -22,10 +24,13 @@ interface TgWebApp {
 export const tg: TgWebApp | undefined = (window as unknown as { Telegram?: { WebApp?: TgWebApp } }).Telegram?.WebApp;
 
 // Telegram's own scheme wins; outside Telegram fall back to the OS preference.
+// A seasonal theme is always dark: it is a night palette.
 function applyTheme() {
-  const dark = tg?.colorScheme ? tg.colorScheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  const bg = dark ? '#0b0b0c' : '#f4f4f0';
+  const root = document.documentElement;
+  if (holiday) root.dataset.holiday = holiday;
+  const dark = holiday ? true : tg?.colorScheme ? tg.colorScheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'dark' : 'light';
+  const bg = holiday === 'halloween' ? '#0e0a12' : dark ? '#0b0b0c' : '#f4f4f0';
   tg?.setHeaderColor?.(bg);
   tg?.setBackgroundColor?.(bg);
   tg?.setBottomBarColor?.(bg);

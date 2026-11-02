@@ -395,3 +395,44 @@ section > .card + .btn, .page > .card + .btn { margin-top: 4px; }
 .search input { background: transparent; border: 0; padding: 14px 0; }
 .search input:focus { background: transparent; border: 0; }
 .tabbar button { min-width: 0; }
+
+/* ---------- Halloween (date-gated, see holiday.ts) ---------- */
+/* Same flat system, night palette: pumpkin orange replaces lime, violet-black surfaces. */
+[data-holiday='halloween'] {
+  --lime: #ff7a1a;
+  --ink: #120a04;
+  --ok: #8fd14f;
+  --bad: #ff4d6d;
+  --bg: #0e0a12;
+  --surface: #18121e;
+  --surface-2: #241b2c;
+  --line: #31263b;
+  --text: #f6ece0;
+  --muted: #9b8ea6;
+  --strong: #ff7a1a;
+  --glass: rgba(24, 18, 30, 0.84);
+}
+[data-holiday='halloween'] .display { color: #fff3e6; }
+[data-holiday='halloween'] .badge.live { background: #b48cff; color: #120a04; }
+[data-holiday='halloween'] .badge.live i { background: #120a04; }
+[data-holiday='halloween'] .invite-card { background: #241b2c; }
+[data-holiday='halloween'] .ticker { -webkit-text-stroke-color: #3a2c46; }
+
+.hw-sky { position: fixed; inset: 0 0 auto 0; height: 160px; pointer-events: none; z-index: 0; overflow: hidden; }
+.hw-bat { position: absolute; width: 34px; fill: #b48cff; opacity: .5; animation: hw-fly 9s ease-in-out infinite; }
+.hw-bat.b0 { top: 18px; right: 18px; }
+.hw-bat.b1 { top: 64px; right: 96px; width: 22px; opacity: .35; animation-duration: 11s; animation-delay: -3s; }
+.hw-bat.b2 { top: 30px; right: 160px; width: 16px; opacity: .25; animation-duration: 13s; animation-delay: -6s; }
+@keyframes hw-fly {
+  0%, 100% { transform: translate(0, 0) rotate(-4deg); }
+  25% { transform: translate(-14px, 8px) rotate(3deg) scaleY(.8); }
+  50% { transform: translate(-4px, -6px) rotate(-2deg); }
+  75% { transform: translate(10px, 4px) rotate(4deg) scaleY(.85); }
+}
+[data-holiday='halloween'] .screen, [data-holiday='halloween'] .onboarding .page { position: relative; z-index: 1; }
+
+.hw-banner { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--r-lg); background: var(--lime); color: var(--ink); }
+.hw-banner b { display: block; font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.hw-banner span { font-size: 13px; font-weight: 600; opacity: .75; }
+.hw-pumpkin { font-size: 30px; line-height: 1; animation: hw-wobble 2.4s ease-in-out infinite; }
+@keyframes hw-wobble { 50% { transform: rotate(-8deg) scale(1.05); } }
