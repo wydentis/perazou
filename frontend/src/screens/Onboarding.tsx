@@ -3,8 +3,7 @@ import { api } from '../api';
 import type { Me } from '../types';
 import { Icon } from '../icons';
 import { haptic } from '../telegram';
-import { Footer, Pumpkin, humanError } from '../ui';
-import { holiday } from '../holiday';
+import { Footer, humanError } from '../ui';
 
 export default function Onboarding({ me, initialCode, onDone, onAdmin }: {
   me: Me; initialCode: string; onDone: () => void; onAdmin?: () => void;
@@ -44,10 +43,8 @@ export default function Onboarding({ me, initialCode, onDone, onAdmin }: {
   return (
     <div className="onboarding">
       <div className="hero-art">
-        <div className="logo big">{holiday === 'halloween' ? <Pumpkin size={72} /> : <Icon name="check" size={44} strokeWidth={3} />}</div>
-        <div className="ticker" aria-hidden>
-          {[0, 1].map((i) => <span key={i}>{(holiday === 'halloween' ? 'БЫЛ · БУ! · ' : 'БЫЛ · НЕ БЫЛ · ').repeat(4)}&nbsp;</span>)}
-        </div>
+        <div className="logo big"><Icon name="check" size={44} strokeWidth={3} /></div>
+        <div className="ticker" aria-hidden><span>БЫЛ · НЕ БЫЛ · БЫЛ · НЕ БЫЛ · БЫЛ · НЕ БЫЛ · БЫЛ · НЕ БЫЛ ·&nbsp;</span><span>БЫЛ · НЕ БЫЛ · БЫЛ · НЕ БЫЛ · БЫЛ · НЕ БЫЛ · БЫЛ · НЕ БЫЛ ·&nbsp;</span></div>
       </div>
       <div className="page">
         <h1 className="display">Привет,<br />{me.user.first_name}</h1>

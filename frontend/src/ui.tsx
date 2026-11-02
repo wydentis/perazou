@@ -1,12 +1,9 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './icons';
-import { holiday } from './holiday';
 import { tg } from './telegram';
 
 // Flat pastel swatches; the initials stay dark on every one of them.
-const SWATCHES = holiday === 'halloween'
-  ? ['#ff7a1a', '#b48cff', '#9be36d', '#ffb347', '#e05a47', '#d9c7ff', '#f2e6c9', '#8f8a99']
-  : ['#d7ff3d', '#b9a8ff', '#ffb4a2', '#9fe8d0', '#ffd66b', '#a8d8ff', '#ff9ed2', '#c9c9c9'];
+const SWATCHES = ['#d7ff3d', '#b9a8ff', '#ffb4a2', '#9fe8d0', '#ffd66b', '#a8d8ff', '#ff9ed2', '#c9c9c9'];
 
 export function Avatar({ name, id, size = 40 }: { name: string; id: number; size?: number }) {
   const initials = name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
@@ -37,7 +34,7 @@ export function Ring({ value, size = 56, stroke = 6, children }: { value: number
 export function Empty({ title, text }: { title: string; text?: string }) {
   return (
     <div className="empty">
-      <div className="empty-orb">{holiday === 'halloween' ? <Pumpkin size={40} /> : <Icon name="sparkle" size={28} />}</div>
+      <div className="empty-orb"><Icon name="sparkle" size={28} /></div>
       <h3>{title}</h3>
       {text && <p>{text}</p>}
     </div>
@@ -104,45 +101,5 @@ export function Footer() {
       Автор — Kiryl Sapeha · tg:{' '}
       <a href={url} onClick={(e) => { if (tg) { e.preventDefault(); tg.openTelegramLink(url); } }}>@{AUTHOR_TG}</a>
     </footer>
-  );
-}
-
-/** Night sky decoration for the Halloween theme: a few bats drifting near the top. */
-export function HalloweenSky() {
-  if (holiday !== 'halloween') return null;
-  const bat = 'M12 7c-1.2-2-3.4-3-5.5-2.6.9.7 1.3 1.6 1.2 2.6C6 6.2 3.5 6.6 2 8.4c1.6-.2 2.9.5 3.5 1.6-1.5.4-2.6 1.4-3 2.8 1.6-.9 3.5-.8 4.9.3.8-1.3 2.4-2.1 4.6-2.1s3.8.8 4.6 2.1c1.4-1.1 3.3-1.2 4.9-.3-.4-1.4-1.5-2.4-3-2.8.6-1.1 1.9-1.8 3.5-1.6-1.5-1.8-4-2.2-5.7-1.4-.1-1 .3-1.9 1.2-2.6C15.4 4 13.2 5 12 7Z';
-  return (
-    <div className="hw-sky" aria-hidden>
-      {[0, 1, 2].map((i) => (
-        <svg key={i} className={`hw-bat b${i}`} viewBox="0 0 24 16"><path d={bat} /></svg>
-      ))}
-    </div>
-  );
-}
-
-export function HalloweenBanner() {
-  if (holiday !== 'halloween') return null;
-  return (
-    <div className="hw-banner">
-      <span className="hw-pumpkin"><Pumpkin size={44} /></span>
-      <div>
-        <b>Хэллоуин на парах</b>
-        <span>Отметься на паре — а то придут за тобой 👻</span>
-      </div>
-    </div>
-  );
-}
-
-/** Flat pumpkin illustration (SVG so it looks the same on every device, unlike emoji). */
-export function Pumpkin({ size = 40 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden className="pumpkin">
-      <path d="M33 14c0-5 3-8 7-9l1 3c-3 1-5 3-5 7z" fill="#4f7a2a" />
-      <ellipse cx="20" cy="37" rx="15" ry="19" fill="#e8650f" />
-      <ellipse cx="44" cy="37" rx="15" ry="19" fill="#e8650f" />
-      <ellipse cx="32" cy="37" rx="15" ry="21" fill="#ff7a1a" />
-      <path d="M20 31l6 5h-8zM44 31l-6 5h8z" fill="#2a1400" />
-      <path d="M17 42q15 12 30 0l-4 1-3 4-3-3-3 3-3-3-3 3-3-4z" fill="#2a1400" />
-    </svg>
   );
 }
