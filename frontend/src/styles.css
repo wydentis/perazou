@@ -434,5 +434,8 @@ section > .card + .btn, .page > .card + .btn { margin-top: 4px; }
 .hw-banner { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--r-lg); background: var(--lime); color: var(--ink); }
 .hw-banner b { display: block; font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
 .hw-banner span { font-size: 13px; font-weight: 600; opacity: .75; }
-.hw-pumpkin { font-size: 30px; line-height: 1; animation: hw-wobble 2.4s ease-in-out infinite; }
+.hw-pumpkin { display: grid; line-height: 0; animation: hw-wobble 2.4s ease-in-out infinite; }
 @keyframes hw-wobble { 50% { transform: rotate(-8deg) scale(1.05); } }
+[data-holiday='halloween'] .logo { background: transparent; transform: none; }
+[data-holiday='halloween'] .logo svg { animation: hw-wobble 2.4s ease-in-out infinite; }
+[data-holiday='halloween'] .empty-orb { background: transparent; }

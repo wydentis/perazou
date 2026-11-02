@@ -16,3 +16,25 @@ export const holiday: Holiday | null = (() => {
   const today = fmtDate(new Date());
   return HOLIDAYS.find((h) => today >= h.from && today <= h.to)?.name ?? null;
 })();
+
+/** Attendance wording; the Halloween theme swaps in playful verbs. */
+export const words =
+  holiday === 'halloween'
+    ? {
+        present: 'Явился',
+        absent: 'Испарился',
+        presentCount: (n: number) => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'явился' : 'явились'}`,
+        absentCount: (n: number) => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'испарился' : 'испарились'}`,
+        absentQuoted: '«испарился»',
+        presentEmoji: '🎃',
+        absentEmoji: '👻',
+      }
+    : {
+        present: 'Был',
+        absent: 'Не был',
+        presentCount: (n: number) => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'был' : 'были'}`,
+        absentCount: (n: number) => `${n} не ${n % 10 === 1 && n % 100 !== 11 ? 'был' : 'были'}`,
+        absentQuoted: '«не был»',
+        presentEmoji: '',
+        absentEmoji: '',
+      };

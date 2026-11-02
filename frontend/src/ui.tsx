@@ -37,7 +37,7 @@ export function Ring({ value, size = 56, stroke = 6, children }: { value: number
 export function Empty({ title, text }: { title: string; text?: string }) {
   return (
     <div className="empty">
-      <div className="empty-orb"><Icon name="sparkle" size={28} /></div>
+      <div className="empty-orb">{holiday === 'halloween' ? <Pumpkin size={40} /> : <Icon name="sparkle" size={28} />}</div>
       <h3>{title}</h3>
       {text && <p>{text}</p>}
     </div>
@@ -124,11 +124,25 @@ export function HalloweenBanner() {
   if (holiday !== 'halloween') return null;
   return (
     <div className="hw-banner">
-      <span className="hw-pumpkin" aria-hidden>🎃</span>
+      <span className="hw-pumpkin"><Pumpkin size={44} /></span>
       <div>
         <b>Хэллоуин на парах</b>
         <span>Отметься на паре — а то придут за тобой 👻</span>
       </div>
     </div>
+  );
+}
+
+/** Flat pumpkin illustration (SVG so it looks the same on every device, unlike emoji). */
+export function Pumpkin({ size = 40 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden className="pumpkin">
+      <path d="M33 14c0-5 3-8 7-9l1 3c-3 1-5 3-5 7z" fill="#4f7a2a" />
+      <ellipse cx="20" cy="37" rx="15" ry="19" fill="#e8650f" />
+      <ellipse cx="44" cy="37" rx="15" ry="19" fill="#e8650f" />
+      <ellipse cx="32" cy="37" rx="15" ry="21" fill="#ff7a1a" />
+      <path d="M20 31l6 5h-8zM44 31l-6 5h8z" fill="#2a1400" />
+      <path d="M17 42q15 12 30 0l-4 1-3 4-3-3-3 3-3-3-3 3-3-4z" fill="#2a1400" />
+    </svg>
   );
 }
