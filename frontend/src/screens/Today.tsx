@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import type { AttendanceRow, Lesson, Me, Slot } from '../types';
-import { addDays, mondayOf, nowMinutesIn, occursOn, parseDate, plural, todayIn, toMinutes, WEEKDAYS_SHORT } from '../util';
+import { addDays, mondayOf, nowMinutesIn, occursOn, parseDate, todayIn, toMinutes, WEEKDAYS_SHORT } from '../util';
 import { haptic } from '../telegram';
+import { words } from '../holiday';
 import { Icon } from '../icons';
-import { Avatar, Empty, Skeleton, humanError, useToast } from '../ui';
+import { Avatar, Empty, HalloweenBanner, Skeleton, humanError, useToast } from '../ui';
 
 export default function Today({ me }: { me: Me }) {
   const group = me.group!;
@@ -86,6 +87,8 @@ export default function Today({ me }: { me: Me }) {
         {date !== today && <button className="chip" onClick={() => setDate(today)}>Сегодня</button>}
       </header>
 
+      <HalloweenBanner />
+
       <div className="weekstrip">
         <button className="icon-btn" onClick={() => setDate(addDays(date, -7))} aria-label="Предыдущая неделя"><Icon name="left" /></button>
         {week.map(({ d: wd, has }, i) => (
@@ -129,18 +132,18 @@ export default function Today({ me }: { me: Me }) {
                   <>
                     <div className="mark">
                       <button className={'mark-btn yes' + (l.my_status === 'present' ? ' on' : '')} disabled={!l.open} onClick={() => mark(l, 'present')}>
-                        <Icon name="check" size={18} /> Был
+                        {words.presentEmoji || <Icon name="check" size={18} />} {words.present}
                       </button>
                       <button className={'mark-btn no' + (l.my_status === 'absent' ? ' on' : '')} disabled={!l.open} onClick={() => mark(l, 'absent')}>
-                        <Icon name="x" size={18} /> Не был
+                        {words.absentEmoji || <Icon name="x" size={18} />} {words.absent}
                       </button>
                     </div>
                     <MarkHint l={l} today={date === today} isHeadman={isHeadman} />
                     <div className="split-bar"><i className="p" style={{ width: pPct + '%' }} /><i className="a" style={{ width: aPct + '%' }} /></div>
                     <div className="meta">
-                      <span className="c-ok">{l.present} {plural(l.present, 'был', 'были', 'были')}</span>
+                      <span className="c-ok">{words.presentCount(l.present)}</span>
                       <span className="c-bad">
-                        {l.absent} не {plural(l.absent, 'был', 'были', 'были')}{l.auto_absent > 0 && ` (${l.auto_absent} авто)`}
+                        {words.absentCount(l.absent)}{l.auto_absent > 0 && ` (${l.auto_absent} авто)`}
                       </span>
                       <span>из {l.total}</span>
                     </div>
@@ -181,7 +184,7 @@ function MarkHint({ l, today, isHeadman }: { l: Lesson; today: boolean; isHeadma
   let text: string;
   if (l.open) text = `Отметиться можно до ${l.closes_at}`;
   else if (!l.started) text = `Отметка откроется в ${l.opens_at} — за 15 минут до начала`;
-  else if (l.my_auto) text = `Не отметились до ${l.closes_at} — автоматически «не был»`;
+  else if (l.my_auto) text = `Не отметились до ${l.closes_at} — автоматически ${words.absentQuoted}`;
   else text = today ? `Отметка закрылась в ${l.closes_at}` : 'Отметка закрыта';
   if (isHeadman && l.started && !l.open) text += ' · исправить можно в «Списке»';
   return <div className={'mark-hint' + (l.open ? ' live' : '')}><Icon name="clock" size={14} /> {text}</div>;
@@ -225,13 +228,13 @@ function Roster({ lesson, onChange }: { lesson: Lesson; onChange: () => void }) 
         <div key={r.user_id} className="roster-row">
           <Avatar name={r.full_name} id={r.user_id} size={34} />
           <span className="grow">{r.full_name}{r.auto && <span className="auto-tag">авто</span>}</span>
-          <button className={'round yes' + (r.status === 'present' ? ' on' : '')} onClick={() => set(r, 'present')} aria-label="Был"><Icon name="check" size={16} /></button>
-          <button className={'round no' + (r.status === 'absent' ? ' on' : '')} onClick={() => set(r, 'absent')} aria-label="Не был"><Icon name="x" size={16} /></button>
+          <button className={'round yes' + (r.status === 'present' ? ' on' : '')} onClick={() => set(r, 'present')} aria-label={words.present}><Icon name="check" size={16} /></button>
+          <button className={'round no' + (r.status === 'absent' ? ' on' : '')} onClick={() => set(r, 'absent')} aria-label={words.absent}><Icon name="x" size={16} /></button>
         </div>
       ))}
       {unmarked > 0 && (
         <button className="btn ghost sm" onClick={markAllUnmarked}>
-          Остальным ({unmarked}) — «не был»
+          Остальным ({unmarked}) — {words.absentQuoted}
         </button>
       )}
     </div>

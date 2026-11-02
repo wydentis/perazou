@@ -3,7 +3,8 @@ import { api, hasCredentials } from './api';
 import type { Me } from './types';
 import { ensureWriteAccess, haptic, inviteCodeFromLaunch } from './telegram';
 import { Icon, type IconName } from './icons';
-import { Footer, humanError, useToast } from './ui';
+import { Footer, HalloweenSky, Pumpkin, humanError, useToast } from './ui';
+import { holiday } from './holiday';
 import Onboarding from './screens/Onboarding';
 import Today from './screens/Today';
 import Schedule from './screens/Schedule';
@@ -57,6 +58,7 @@ export default function App() {
   const isHeadman = me.member.role === 'headman';
   return (
     <div className="app">
+      <HalloweenSky />
       <main key={tab} className="screen">
         {tab === 'today' && <Today me={me} />}
         {tab === 'schedule' && <Schedule group={me.group} isHeadman={isHeadman} />}
@@ -81,7 +83,7 @@ export default function App() {
 function Splash({ text, loading }: { text?: string; loading?: boolean }) {
   return (
     <div className="splash">
-      <div className="logo"><Icon name="check" size={34} strokeWidth={3} /></div>
+      <div className="logo">{holiday === 'halloween' ? <Pumpkin size={52} /> : <Icon name="check" size={34} strokeWidth={3} />}</div>
       {loading ? <div className="dots"><i /><i /><i /></div> : <p>{text}</p>}
     </div>
   );
