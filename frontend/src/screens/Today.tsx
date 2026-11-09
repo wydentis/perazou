@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import type { AttendanceRow, Lesson, Me, Slot } from '../types';
-import { addDays, mondayOf, nowMinutesIn, occursOn, parseDate, plural, todayIn, toMinutes, WEEKDAYS_SHORT } from '../util';
+import { addDays, lessonsRefreshDelay, mondayOf, nowMinutesIn, occursOn, parseDate, plural, todayIn, toMinutes, WEEKDAYS_SHORT } from '../util';
 import { haptic } from '../telegram';
 import { Icon } from '../icons';
 import { Avatar, Empty, Skeleton, humanError, useToast } from '../ui';
@@ -25,11 +25,19 @@ export default function Today({ me }: { me: Me }) {
     setExpanded(null);
     load();
   }, [load]);
-  // The 15-minute marking window opens and closes on its own; keep today's view current.
+  // Marking windows open and close on their own. Refresh only when that can change what is
+  // shown (see lessonsRefreshDelay), and never while the app is hidden.
   useEffect(() => {
-    if (date !== today) return;
-    const t = setInterval(load, 30_000);
-    return () => clearInterval(t);
+    if (date !== today || !lessons || document.hidden) return;
+    const delay = lessonsRefreshDelay(lessons, nowMinutesIn(group.timezone), new Date().getSeconds());
+    if (delay === null) return;
+    const t = setTimeout(load, delay);
+    return () => clearTimeout(t);
+  }, [date, today, lessons, load, group.timezone]);
+  useEffect(() => {
+    const onVisible = () => { if (!document.hidden && date === today) load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [date, today, load]);
 
   const week = useMemo(() => {

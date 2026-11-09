@@ -86,6 +86,7 @@ export function humanError(e: unknown): string {
     'headman cannot leave the group': 'Староста не может выйти из группы',
     'invalid slot': 'Проверьте поля пары',
     'admin only': 'Доступно только администратору',
+    'too many requests': 'Слишком много запросов — подождите пару секунд',
     'init data expired': 'Сессия устарела — перезапустите приложение',
   };
   return map[m] ?? (m || 'Что-то пошло не так');

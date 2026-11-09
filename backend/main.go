@@ -29,7 +29,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	a := &app{db: pool, cfg: cfg}
+	a := &app{db: pool, cfg: cfg, limiter: newRateLimiter(120, 120)}
 	if cfg.BotToken != "" {
 		a.bot = newBot(cfg.BotToken, cfg.WebAppURL)
 	}
