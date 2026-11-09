@@ -62,3 +62,23 @@ export function plural(n: number, one: string, few: string, many: string): strin
   if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
   return many;
 }
+
+/**
+ * When the lessons screen should refresh next, in ms, or null if nothing will change today.
+ * While any window is open, poll so counters stay fresh; otherwise wake once at the next
+ * moment a lesson's state flips (window opens, lesson starts, window closes).
+ */
+export function lessonsRefreshDelay(
+  lessons: { cancelled: boolean; open: boolean; opens_at: string; start_time: string; closes_at: string }[],
+  nowMin: number,
+  nowSec: number,
+): number | null {
+  const live = lessons.filter((l) => !l.cancelled);
+  if (live.some((l) => l.open)) return 30_000;
+  const next = live
+    .flatMap((l) => [l.opens_at, l.start_time, l.closes_at].map(toMinutes))
+    .filter((m) => m > nowMin)
+    .sort((a, b) => a - b)[0];
+  if (next === undefined) return null;
+  return ((next - nowMin) * 60 - nowSec) * 1000 + 1500; // just after the flip
+}

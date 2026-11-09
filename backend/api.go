@@ -21,6 +21,9 @@ type app struct {
 	db  *pgxpool.Pool
 	cfg config
 	bot *bot // nil when BOT_TOKEN is not set
+	// limiter caps requests per Telegram user; humans stay far below it (a headman
+	// marking a 30-person roster makes ~90 requests a minute).
+	limiter *rateLimiter
 }
 
 type groupInfo struct {
@@ -143,6 +146,13 @@ func (a *app) authMiddleware(c *gin.Context) {
 		u, err = validateInitData(initData, a.cfg.BotToken, 24*time.Hour, time.Now())
 		if err != nil {
 			fail(c, http.StatusUnauthorized, err.Error())
+			return
+		}
+	}
+	if a.limiter != nil {
+		if ok, wait := a.limiter.allow(u.ID); !ok {
+			c.Header("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
+			fail(c, http.StatusTooManyRequests, "too many requests")
 			return
 		}
 	}
