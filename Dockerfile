@@ -5,6 +5,8 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
 RUN npm run build
+# Pre-compress text assets; the server sends the .gz copy to clients that accept gzip.
+RUN find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.svg' \) -exec gzip -9 -k {} \;
 
 FROM golang:1.25-alpine AS api
 WORKDIR /src
