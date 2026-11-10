@@ -32,6 +32,7 @@ func main() {
 	a := &app{db: pool, cfg: cfg, limiter: newRateLimiter(120, 120)}
 	if cfg.BotToken != "" {
 		a.bot = newBot(cfg.BotToken, cfg.WebAppURL)
+		a.bot.onCallback = a.markCallback
 	}
 	srv := &http.Server{Addr: cfg.Addr, Handler: newRouter(a), ReadHeaderTimeout: 10 * time.Second}
 	if a.bot != nil {

@@ -27,6 +27,32 @@ type bot struct {
 	webURL string
 	secret string // X-Telegram-Bot-Api-Secret-Token expected on webhook calls
 	http   *http.Client
+	// onCallback handles inline-button presses (the reminder's Был / Не был buttons).
+	onCallback func(ctx context.Context, cq *callbackQuery) callbackReply
+}
+
+// callbackQuery is a press of an inline button. From is set by Telegram, and updates are
+// accepted only with our webhook secret, so it identifies the person who pressed it.
+type callbackQuery struct {
+	ID   string `json:"id"`
+	From struct {
+		ID int64 `json:"id"`
+	} `json:"from"`
+	Data    string `json:"data"`
+	Message *struct {
+		MessageID int64 `json:"message_id"`
+		Chat      struct {
+			ID int64 `json:"id"`
+		} `json:"chat"`
+	} `json:"message"`
+}
+
+// callbackReply is what to show after a press: a toast, and optionally new message text
+// and keyboard (Text == "" leaves the message as it is).
+type callbackReply struct {
+	Answer   string
+	Text     string
+	Keyboard any
 }
 
 const webhookPath = "/telegram/webhook"
@@ -77,6 +103,32 @@ type update struct {
 			Type string `json:"type"`
 		} `json:"chat"`
 	} `json:"message"`
+	CallbackQuery *callbackQuery `json:"callback_query"`
+}
+
+var allowedUpdates = []string{"message", "callback_query"}
+
+// handleCallback runs the press handler and, if the message should change, edits it in the
+// background; the returned payload answers the press (stops the button's spinner).
+func (b *bot) handleCallback(ctx context.Context, cq *callbackQuery) map[string]any {
+	r := callbackReply{Answer: "Кнопка устарела"}
+	if b.onCallback != nil {
+		r = b.onCallback(ctx, cq)
+	}
+	if r.Text != "" && cq.Message != nil {
+		edit := map[string]any{"chat_id": cq.Message.Chat.ID, "message_id": cq.Message.MessageID, "text": r.Text}
+		if r.Keyboard != nil {
+			edit["reply_markup"] = r.Keyboard
+		}
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			if err := b.call(ctx, "editMessageText", edit, nil); err != nil && !strings.Contains(err.Error(), "message is not modified") {
+				log.Println("bot:", err)
+			}
+		}()
+	}
+	return map[string]any{"callback_query_id": cq.ID, "text": r.Answer}
 }
 
 // Bot profile texts, applied on every start so the code is the single source of truth.
@@ -134,7 +186,7 @@ func (b *bot) registerWebhook(ctx context.Context) {
 	payload := map[string]any{
 		"url":             b.webURL + webhookPath,
 		"secret_token":    b.secret,
-		"allowed_updates": []string{"message"},
+		"allowed_updates": allowedUpdates,
 	}
 	for delay := 5 * time.Second; ; delay = min(delay*2, 5*time.Minute) {
 		err := b.call(ctx, "setWebhook", payload, nil)
@@ -159,7 +211,7 @@ func (b *bot) poll(ctx context.Context) {
 	var offset int64
 	for ctx.Err() == nil {
 		var updates []update
-		err := b.call(ctx, "getUpdates", map[string]any{"offset": offset, "timeout": 30, "allowed_updates": []string{"message"}}, &updates)
+		err := b.call(ctx, "getUpdates", map[string]any{"offset": offset, "timeout": 30, "allowed_updates": allowedUpdates}, &updates)
 		if err != nil {
 			if ctx.Err() == nil {
 				log.Println("bot:", err)
@@ -169,6 +221,12 @@ func (b *bot) poll(ctx context.Context) {
 		}
 		for _, u := range updates {
 			offset = u.UpdateID + 1
+			if u.CallbackQuery != nil {
+				if err := b.call(ctx, "answerCallbackQuery", b.handleCallback(ctx, u.CallbackQuery), nil); err != nil {
+					log.Println("bot:", err)
+				}
+				continue
+			}
 			if reply := b.replyTo(u); reply != nil {
 				if err := b.call(ctx, "sendMessage", reply, nil); err != nil {
 					log.Println("bot:", err)
@@ -190,6 +248,12 @@ func (b *bot) webhook(c *gin.Context) {
 	if err := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)).Decode(&u); err != nil {
 		// Acknowledge anyway: a non-2xx makes Telegram redeliver the same update forever.
 		c.Status(http.StatusOK)
+		return
+	}
+	if u.CallbackQuery != nil {
+		answer := b.handleCallback(c.Request.Context(), u.CallbackQuery)
+		answer["method"] = "answerCallbackQuery"
+		c.JSON(http.StatusOK, answer)
 		return
 	}
 	reply := b.replyTo(u)

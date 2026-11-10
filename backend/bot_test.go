@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -91,5 +92,33 @@ func TestIsAdmin(t *testing.T) {
 	t.Setenv("ADMIN_IDS", "abc")
 	if _, err := loadConfig(); err == nil {
 		t.Error("invalid ADMIN_IDS accepted")
+	}
+}
+
+func TestWebhookCallback(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	b := newBot("123:abc", "https://perazou.example")
+	var got *callbackQuery
+	b.onCallback = func(_ context.Context, cq *callbackQuery) callbackReply {
+		got = cq
+		return callbackReply{Answer: "ok"} // no Text: the message is left alone
+	}
+	r := gin.New()
+	r.POST(webhookPath, b.webhook)
+	body := `{"update_id":3,"callback_query":{"id":"cb1","from":{"id":42},"data":"m|7|2026-11-10|present"}}`
+	req := httptest.NewRequest(http.MethodPost, webhookPath, strings.NewReader(body))
+	req.Header.Set("X-Telegram-Bot-Api-Secret-Token", b.secret)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	var reply map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply["method"] != "answerCallbackQuery" || reply["callback_query_id"] != "cb1" || reply["text"] != "ok" {
+		t.Errorf("reply: %s", w.Body)
+	}
+	if got == nil || got.From.ID != 42 || got.Data != "m|7|2026-11-10|present" {
+		t.Errorf("callback not passed through: %+v", got)
 	}
 }

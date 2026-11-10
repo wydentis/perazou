@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"regexp"
 	"sort"
@@ -143,22 +144,24 @@ func (a *app) deleteSlot(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// findLesson loads a slot of the caller's group and checks it is scheduled on date.
+// findLesson is loadLesson for HTTP handlers: it answers the request itself on failure.
 func (a *app) findLesson(c *gin.Context, s *session, slotID int64, dateStr string) (slot, time.Time, bool) {
-	date, err := parseDate(dateStr)
+	sl, date, err := a.loadLesson(c, s, slotID, dateStr)
 	if err != nil {
-		fail(c, http.StatusBadRequest, "invalid date")
-		return slot{}, date, false
-	}
-	sl, err := scanSlot(a.db.QueryRow(c, `SELECT `+slotCols+` FROM schedule_slots WHERE id=$1 AND group_id=$2`, slotID, s.Group.ID))
-	if err == pgx.ErrNoRows || (err == nil && !sl.occursOn(date)) {
-		fail(c, http.StatusNotFound, "lesson not found")
-		return slot{}, date, false
-	} else if err != nil {
-		serverErr(c, err)
+		failWith(c, err)
 		return slot{}, date, false
 	}
 	return sl, date, true
+}
+
+// failWith answers with a userError's status and message, or 500 for anything else.
+func failWith(c *gin.Context, err error) {
+	var ue *userError
+	if errors.As(err, &ue) {
+		fail(c, ue.code, ue.msg)
+		return
+	}
+	serverErr(c, err)
 }
 
 type lesson struct {
@@ -407,54 +410,8 @@ func (a *app) markAttendance(c *gin.Context) {
 	if req.UserID != nil {
 		target = *req.UserID
 	}
-	if target != s.UserID && s.Role != "headman" {
-		fail(c, http.StatusForbidden, "headman only")
-		return
-	}
-	sl, date, ok := a.findLesson(c, s, req.SlotID, req.Date)
-	if !ok {
-		return
-	}
-	var isCancelled bool
-	if err := a.db.QueryRow(c, `SELECT EXISTS (SELECT 1 FROM lesson_cancellations WHERE slot_id=$1 AND lesson_date=$2::date)`, sl.ID, req.Date).Scan(&isCancelled); err != nil {
-		serverErr(c, err)
-		return
-	}
-	if isCancelled {
-		fail(c, http.StatusConflict, "lesson is cancelled")
-		return
-	}
-	started, open := lessonState(s.Group.now(), date, sl.StartTime)
-	if !started && !open {
-		fail(c, http.StatusConflict, "marking has not opened yet")
-		return
-	}
-	if s.Role != "headman" && !open {
-		fail(c, http.StatusConflict, "marking is closed for this lesson")
-		return
-	}
-	var err error
-	if req.Status == "none" {
-		_, err = a.db.Exec(c, `DELETE FROM attendance a USING members m
-			WHERE a.slot_id=$1 AND a.lesson_date=$2::date AND a.user_id=$3 AND m.user_id=a.user_id AND m.group_id=$4`,
-			sl.ID, req.Date, target, s.Group.ID)
-	} else {
-		var tag int64
-		// Insert only for members of the caller's group.
-		err = a.db.QueryRow(c, `
-			WITH ins AS (
-				INSERT INTO attendance (slot_id, lesson_date, user_id, status, marked_by)
-				SELECT $1, $2::date, m.user_id, $4, $5 FROM members m WHERE m.user_id=$3 AND m.group_id=$6
-				ON CONFLICT (slot_id, lesson_date, user_id) DO UPDATE SET status=$4, marked_by=$5, updated_at=now()
-				RETURNING 1)
-			SELECT count(*) FROM ins`, sl.ID, req.Date, target, req.Status, s.UserID, s.Group.ID).Scan(&tag)
-		if err == nil && tag == 0 {
-			fail(c, http.StatusNotFound, "member not found")
-			return
-		}
-	}
-	if err != nil {
-		serverErr(c, err)
+	if _, err := a.applyMark(c, s, target, req.SlotID, req.Date, req.Status); err != nil {
+		failWith(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
