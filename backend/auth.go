@@ -18,6 +18,8 @@ type tgUser struct {
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 	Username  string `json:"username"`
+	// AuthDate is when Telegram issued this initData, i.e. when the Mini App was opened.
+	AuthDate time.Time `json:"-"`
 }
 
 var errBadInitData = errors.New("invalid init data")
@@ -61,6 +63,7 @@ func validateInitData(initData, botToken string, maxAge time.Duration, now time.
 	if err := json.Unmarshal([]byte(vals.Get("user")), &u); err != nil || u.ID == 0 {
 		return nil, errBadInitData
 	}
+	u.AuthDate = time.Unix(authDate, 0)
 	return &u, nil
 }
 

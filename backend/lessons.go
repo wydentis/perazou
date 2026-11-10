@@ -48,6 +48,10 @@ func clockMinutes(s string) int {
 	return t.Hour()*60 + t.Minute()
 }
 
+// markSessionMaxAge is how long after opening the Mini App its session may still change
+// attendance (see markAttendance).
+const markSessionMaxAge = time.Hour
+
 // Students may mark themselves from markBefore minutes before a lesson starts until
 // markAfter minutes after it started.
 const (

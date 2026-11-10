@@ -132,7 +132,7 @@ func (a *app) authMiddleware(c *gin.Context) {
 			id, name, _ := strings.Cut(h, ":")
 			uid, err := strconv.ParseInt(id, 10, 64)
 			if err == nil {
-				u = &tgUser{ID: uid, FirstName: name}
+				u = &tgUser{ID: uid, FirstName: name, AuthDate: time.Now()}
 			}
 		}
 	}

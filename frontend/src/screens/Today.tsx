@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import type { AttendanceRow, Lesson, Me, Slot } from '../types';
 import { addDays, lessonsRefreshDelay, mondayOf, nowMinutesIn, occursOn, parseDate, plural, todayIn, toMinutes, WEEKDAYS_SHORT } from '../util';
-import { haptic } from '../telegram';
+import { canMarkWithThisSession, haptic } from '../telegram';
 import { Icon } from '../icons';
 import { Avatar, Empty, Skeleton, humanError, useToast } from '../ui';
 
@@ -93,6 +93,13 @@ export default function Today({ me }: { me: Me }) {
         </div>
         {date !== today && <button className="chip" onClick={() => setDate(today)}>Сегодня</button>}
       </header>
+
+      {date === today && lessons?.some((l) => l.open) && !canMarkWithThisSession() && (
+        <div className="stale-session">
+          <Icon name="refresh" size={18} />
+          <span>Приложение открыто больше часа назад. Закройте его и откройте снова, чтобы отметиться.</span>
+        </div>
+      )}
 
       <div className="weekstrip">
         <button className="icon-btn" onClick={() => setDate(addDays(date, -7))} aria-label="Предыдущая неделя"><Icon name="left" /></button>

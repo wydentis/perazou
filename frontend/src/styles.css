@@ -395,3 +395,5 @@ section > .card + .btn, .page > .card + .btn { margin-top: 4px; }
 .search input { background: transparent; border: 0; padding: 14px 0; }
 .search input:focus { background: transparent; border: 0; }
 .tabbar button { min-width: 0; }
+.stale-session { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--r-md); background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--text); font-size: 13px; font-weight: 600; line-height: 1.35; }
+.stale-session svg { color: var(--bad); flex: none; margin-top: 1px; }

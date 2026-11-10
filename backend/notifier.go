@@ -92,7 +92,7 @@ func (a *app) notifyGroup(ctx context.Context, g groupRow) error {
 			return err
 		}
 		for _, uid := range users {
-			if err := a.bot.call(ctx, "sendMessage", a.reminder(uid, sl), nil); err != nil {
+			if err := a.bot.call(ctx, "sendMessage", a.reminder(uid, sl, dateStr), nil); err != nil {
 				if retryable(err) {
 					// Release the claim so the next tick tries again while the window is open.
 					a.db.Exec(ctx, `DELETE FROM lesson_notifications WHERE slot_id=$1 AND lesson_date=$2::date AND user_id=$3`, sl.ID, dateStr, uid)
@@ -106,19 +106,32 @@ func (a *app) notifyGroup(ctx context.Context, g groupRow) error {
 	return nil
 }
 
-func (a *app) reminder(userID int64, sl slot) map[string]any {
+func (a *app) reminder(userID int64, sl slot, date string) map[string]any {
+	return map[string]any{
+		"chat_id":      userID,
+		"text":         reminderText(sl),
+		"reply_markup": a.reminderKeyboard(sl, date),
+	}
+}
+
+func reminderText(sl slot) string {
 	text := fmt.Sprintf("🔔 Началась пара «%s» в %s", sl.Subject, sl.StartTime)
 	if sl.Room != "" {
 		text += ", ауд. " + sl.Room
 	}
-	text += fmt.Sprintf(".\nОтметься до %s — потом будет автоматически «не был».", markClosesAt(sl.StartTime))
-	return map[string]any{
-		"chat_id": userID,
-		"text":    text,
-		"reply_markup": map[string]any{"inline_keyboard": [][]map[string]any{{
-			{"text": "Отметиться", "web_app": map[string]string{"url": a.cfg.WebAppURL}},
-		}}},
-	}
+	return text + fmt.Sprintf(".\nОтметься до %s — потом будет автоматически «не был».", markClosesAt(sl.StartTime))
+}
+
+// reminderKeyboard lets people mark right from the chat; the app stays one tap away.
+func (a *app) reminderKeyboard(sl slot, date string) map[string]any {
+	data := func(status string) string { return fmt.Sprintf("m|%d|%s|%s", sl.ID, date, status) }
+	return map[string]any{"inline_keyboard": [][]map[string]any{
+		{
+			{"text": "✅ Был", "callback_data": data("present")},
+			{"text": "❌ Не был", "callback_data": data("absent")},
+		},
+		{{"text": "Открыть приложение", "web_app": map[string]string{"url": a.cfg.WebAppURL}}},
+	}}
 }
 
 // retryable reports whether a failed send may succeed later. Telegram refuses for good
