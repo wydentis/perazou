@@ -36,7 +36,9 @@ func (a *app) loadLesson(ctx context.Context, s *session, slotID int64, dateStr 
 // applyMark sets (present/absent) or clears (none) target's mark on a lesson, enforcing the
 // same rules wherever the mark comes from (the Mini App or the bot's buttons): students
 // mark only themselves and only while the window is open; the headman may mark anyone in
-// the group once the lesson has started or its window is open.
+// the group once the lesson has started or its window is open. While the headman keeps
+// correction mode on, students may also change their own mark on a past lesson; each such
+// change is logged in attendance_corrections.
 func (a *app) applyMark(ctx context.Context, s *session, target, slotID int64, dateStr, status string) (slot, error) {
 	if target != s.UserID && s.Role != "headman" {
 		return slot{}, refuse(http.StatusForbidden, "headman only")
@@ -57,8 +59,15 @@ func (a *app) applyMark(ctx context.Context, s *session, target, slotID int64, d
 	if !started && !open {
 		return sl, refuse(http.StatusConflict, "marking has not opened yet")
 	}
+	correction := false
 	if s.Role != "headman" && !open {
-		return sl, refuse(http.StatusConflict, "marking is closed for this lesson")
+		if !s.Group.CorrectionsOpen || target != s.UserID || status == "none" {
+			return sl, refuse(http.StatusConflict, "marking is closed for this lesson")
+		}
+		correction = true
+	}
+	if correction {
+		return sl, a.applyCorrection(ctx, s, sl, dateStr, status)
 	}
 	if status == "none" {
 		_, err = a.db.Exec(ctx, `DELETE FROM attendance a USING members m

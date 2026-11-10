@@ -321,7 +321,8 @@ func (a *app) lessonAttendance(c *gin.Context) {
 	started, open := lessonState(s.Group.now(), date, sl.StartTime)
 	auto := autoAbsent(started, open, isCancelled)
 	rows, err := a.db.Query(c, `
-		SELECT m.user_id, m.full_name, COALESCE(a.status, ''), (m.joined_at AT TIME ZONE $4)::date <= $3::date
+		SELECT m.user_id, m.full_name, COALESCE(a.status, ''), (m.joined_at AT TIME ZONE $4)::date <= $3::date,
+			EXISTS (SELECT 1 FROM attendance_corrections ac WHERE ac.slot_id=$2 AND ac.lesson_date=$3::date AND ac.user_id=m.user_id)
 		FROM members m
 		LEFT JOIN attendance a ON a.user_id = m.user_id AND a.slot_id=$2 AND a.lesson_date=$3::date
 		WHERE m.group_id=$1 ORDER BY m.full_name`, s.Group.ID, slotID, c.Query("date"), s.Group.Timezone)
@@ -331,16 +332,17 @@ func (a *app) lessonAttendance(c *gin.Context) {
 	}
 	defer rows.Close()
 	type row struct {
-		UserID   int64  `json:"user_id"`
-		FullName string `json:"full_name"`
-		Status   string `json:"status"`
-		Auto     bool   `json:"auto"`
+		UserID    int64  `json:"user_id"`
+		FullName  string `json:"full_name"`
+		Status    string `json:"status"`
+		Auto      bool   `json:"auto"`
+		Corrected bool   `json:"corrected"` // the student changed it later in correction mode
 	}
 	out := []row{}
 	for rows.Next() {
 		var r row
 		var expected bool
-		if err := rows.Scan(&r.UserID, &r.FullName, &r.Status, &expected); err != nil {
+		if err := rows.Scan(&r.UserID, &r.FullName, &r.Status, &expected, &r.Corrected); err != nil {
 			serverErr(c, err)
 			return
 		}

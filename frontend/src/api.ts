@@ -1,5 +1,5 @@
 import { tg } from './telegram';
-import type { AdminGroup, AdminUser, AttendanceRow, GroupDetails, ImportGroup, Lesson, Me, Slot, Stats } from './types';
+import type { AdminGroup, AdminUser, AttendanceRow, CorrectableLesson, CorrectionEntry, GroupDetails, ImportGroup, Lesson, Me, Slot, Stats } from './types';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -58,6 +58,9 @@ export const api = {
     request<AttendanceRow[]>('GET', `/lessons/attendance?slot_id=${slotId}&date=${date}`),
   cancelLesson: (slot_id: number, date: string, cancelled: boolean) => request<void>('PUT', '/lessons/cancel', { slot_id, date, cancelled }),
   mark: (b: { slot_id: number; date: string; status: 'present' | 'absent' | 'none'; user_id?: number }) => request<void>('PUT', '/attendance', b),
+  setCorrectionsOpen: (open: boolean) => request<void>('PUT', '/group/corrections', { open }),
+  myCorrectableLessons: () => request<{ corrections_open: boolean; lessons: CorrectableLesson[] }>('GET', '/corrections/mine'),
+  correctionsLog: () => request<CorrectionEntry[]>('GET', '/corrections/log'),
   adminOverview: () => request<{ users: AdminUser[]; groups: AdminGroup[] }>('GET', '/admin/overview'),
   stats: (from: string, to: string) => request<Stats>('GET', `/stats?from=${from}&to=${to}`),
 };

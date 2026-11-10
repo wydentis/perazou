@@ -2,6 +2,7 @@ export interface Group {
   id: number;
   name: string;
   timezone: string;
+  corrections_open: boolean;
 }
 export interface Member {
   user_id: number;
@@ -67,6 +68,28 @@ export interface AttendanceRow {
   full_name: string;
   status: Status;
   auto: boolean; // "absent" set automatically after the marking window closed
+  corrected: boolean; // changed later by the student in correction mode
+}
+export interface CorrectableLesson {
+  date: string;
+  slot_id: number;
+  subject: string;
+  start_time: string;
+  end_time: string;
+  status: Status;
+  auto: boolean;
+  corrected: boolean;
+}
+export interface CorrectionEntry {
+  id: number;
+  user_id: number;
+  full_name: string;
+  subject: string;
+  date: string;
+  start_time: string;
+  old_status: 'present' | 'absent' | 'auto';
+  new_status: 'present' | 'absent';
+  changed_at: string;
 }
 export interface StatRow {
   user_id: number;

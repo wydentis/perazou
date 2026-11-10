@@ -27,9 +27,10 @@ type app struct {
 }
 
 type groupInfo struct {
-	ID       int64  `json:"id"`
-	Name     string `json:"name"`
-	Timezone string `json:"timezone"`
+	ID              int64  `json:"id"`
+	Name            string `json:"name"`
+	Timezone        string `json:"timezone"`
+	CorrectionsOpen bool   `json:"corrections_open"`
 }
 
 type memberInfo struct {
@@ -53,10 +54,11 @@ type session struct {
 }
 
 type groupRow struct {
-	ID       int64
-	Name     string
-	Code     string
-	Timezone string
+	ID              int64
+	Name            string
+	Code            string
+	Timezone        string
+	CorrectionsOpen bool
 }
 
 func (g groupRow) loc() *time.Location {
@@ -75,7 +77,7 @@ func (g groupRow) now() time.Time {
 }
 
 func (g groupRow) info() groupInfo {
-	return groupInfo{ID: g.ID, Name: g.Name, Timezone: g.Timezone}
+	return groupInfo{ID: g.ID, Name: g.Name, Timezone: g.Timezone, CorrectionsOpen: g.CorrectionsOpen}
 }
 
 func newRouter(a *app) *gin.Engine {
@@ -101,6 +103,9 @@ func newRouter(a *app) *gin.Engine {
 	m.GET("/group", a.getGroup)
 	m.PATCH("/group", headmanOnly, a.updateGroup)
 	m.POST("/group/invite/regenerate", headmanOnly, a.regenerateInvite)
+	m.PUT("/group/corrections", headmanOnly, a.setCorrectionsOpen)
+	m.GET("/corrections/mine", a.myCorrectableLessons)
+	m.GET("/corrections/log", headmanOnly, a.correctionsLog)
 	m.POST("/group/leave", a.leaveGroup)
 	m.PATCH("/members/:id", a.renameMember)
 	m.DELETE("/members/:id", headmanOnly, a.removeMember)
@@ -170,9 +175,9 @@ func (a *app) authMiddleware(c *gin.Context) {
 func (a *app) loadSession(ctx context.Context, userID int64) (*session, error) {
 	s := &session{UserID: userID}
 	err := a.db.QueryRow(ctx, `
-		SELECT m.full_name, m.role, g.id, g.name, g.invite_code, g.timezone
+		SELECT m.full_name, m.role, g.id, g.name, g.invite_code, g.timezone, g.corrections_open
 		FROM members m JOIN groups g ON g.id = m.group_id WHERE m.user_id = $1`, userID).
-		Scan(&s.FullName, &s.Role, &s.Group.ID, &s.Group.Name, &s.Group.Code, &s.Group.Timezone)
+		Scan(&s.FullName, &s.Role, &s.Group.ID, &s.Group.Name, &s.Group.Code, &s.Group.Timezone, &s.Group.CorrectionsOpen)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
