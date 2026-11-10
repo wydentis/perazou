@@ -397,3 +397,13 @@ section > .card + .btn, .page > .card + .btn { margin-top: 4px; }
 .tabbar button { min-width: 0; }
 .stale-session { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--r-md); background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--text); font-size: 13px; font-weight: 600; line-height: 1.35; }
 .stale-session svg { color: var(--bad); flex: none; margin-top: 1px; }
+
+/* ---------- corrections ---------- */
+.corr-entry { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--line); color: var(--text); }
+.corr-entry b { display: block; font-weight: 700; }
+.corr-entry small { display: block; font-size: 12px; color: var(--muted); font-weight: 500; }
+.corr-entry.on { background: var(--lime); border-color: var(--lime); color: var(--ink); }
+.corr-entry.on small { color: var(--ink); opacity: .65; }
+.corr-banner { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface-2); font-size: 13px; font-weight: 600; line-height: 1.35; }
+.corr-banner.on { background: var(--lime); color: var(--ink); }
+.round:disabled { opacity: .35; }

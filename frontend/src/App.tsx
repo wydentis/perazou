@@ -58,7 +58,7 @@ export default function App() {
   return (
     <div className="app">
       <main key={tab} className="screen">
-        {tab === 'today' && <Today me={me} />}
+        {tab === 'today' && <Today me={me} onChanged={reload} />}
         {tab === 'schedule' && <Schedule group={me.group} isHeadman={isHeadman} />}
         {tab === 'stats' && <StatsScreen me={me} />}
         {tab === 'group' && <GroupScreen me={me} onChanged={reload} />}

@@ -5,8 +5,9 @@ import { addDays, lessonsRefreshDelay, mondayOf, nowMinutesIn, occursOn, parseDa
 import { canMarkWithThisSession, haptic } from '../telegram';
 import { Icon } from '../icons';
 import { Avatar, Empty, Skeleton, humanError, useToast } from '../ui';
+import CorrectionsScreen from './Corrections';
 
-export default function Today({ me }: { me: Me }) {
+export default function Today({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const group = me.group!;
   const isHeadman = me.member!.role === 'headman';
   const today = todayIn(group.timezone);
@@ -15,6 +16,7 @@ export default function Today({ me }: { me: Me }) {
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [correcting, setCorrecting] = useState(false);
 
   useEffect(() => { api.schedule().then(setSlots, () => {}); }, []);
   const load = useCallback(() => {
@@ -78,6 +80,10 @@ export default function Today({ me }: { me: Me }) {
     }
   }
 
+  if (correcting) {
+    return <CorrectionsScreen me={me} onBack={() => { setCorrecting(false); load(); }} onChanged={onChanged} />;
+  }
+
   const d = parseDate(date);
   const nowMin = nowMinutesIn(group.timezone);
 
@@ -99,6 +105,17 @@ export default function Today({ me }: { me: Me }) {
           <Icon name="refresh" size={18} />
           <span>Приложение открыто больше часа назад. Закройте его и откройте снова, чтобы отметиться.</span>
         </div>
+      )}
+
+      {(isHeadman || group.corrections_open) && (
+        <button className={'corr-entry' + (group.corrections_open ? ' on' : '')} onClick={() => { haptic.tap(); setCorrecting(true); }}>
+          <Icon name="edit" size={18} />
+          <span className="grow">
+            <b>{isHeadman ? 'Исправления отметок' : 'Исправить свои отметки'}</b>
+            <small>{isHeadman ? (group.corrections_open ? 'Включено · журнал изменений' : 'Выключено') : 'Староста разрешил поправить «н»'}</small>
+          </span>
+          <Icon name="right" size={16} />
+        </button>
       )}
 
       <div className="weekstrip">
@@ -239,7 +256,7 @@ function Roster({ lesson, onChange }: { lesson: Lesson; onChange: () => void }) 
       {rows.map((r) => (
         <div key={r.user_id} className="roster-row">
           <Avatar name={r.full_name} id={r.user_id} size={34} />
-          <span className="grow">{r.full_name}{r.auto && <span className="auto-tag">авто</span>}</span>
+          <span className="grow">{r.full_name}{r.auto && <span className="auto-tag">авто</span>}{r.corrected && <span className="auto-tag">испр.</span>}</span>
           <button className={'round yes' + (r.status === 'present' ? ' on' : '')} onClick={() => set(r, 'present')} aria-label="Был"><Icon name="check" size={16} /></button>
           <button className={'round no' + (r.status === 'absent' ? ' on' : '')} onClick={() => set(r, 'absent')} aria-label="Не был"><Icon name="x" size={16} /></button>
         </div>
