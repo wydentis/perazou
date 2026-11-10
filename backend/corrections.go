@@ -70,24 +70,21 @@ type correctableLesson struct {
 // myCorrectableLessons lists all of the caller's lessons that have already started, newest
 // first, from the day they joined, with their current mark. Lessons before joining are left
 // out: they do not count towards the member's stats. A two-year bound keeps the loop finite.
-func (a *app) myCorrectableLessons(c *gin.Context) {
-	s := sess(c)
+func (a *app) memberLessons(ctx context.Context, s *session, userID int64) ([]correctableLesson, error) {
 	now := s.Group.now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	var joined string
-	if err := a.db.QueryRow(c, `SELECT to_char(joined_at AT TIME ZONE $2, 'YYYY-MM-DD') FROM members WHERE user_id=$1`,
-		s.UserID, s.Group.Timezone).Scan(&joined); err != nil {
-		serverErr(c, err)
-		return
+	if err := a.db.QueryRow(ctx, `SELECT to_char(joined_at AT TIME ZONE $2, 'YYYY-MM-DD') FROM members WHERE user_id=$1`,
+		userID, s.Group.Timezone).Scan(&joined); err != nil {
+		return nil, err
 	}
 	from := today.AddDate(-2, 0, 0)
 	if j, err := parseDate(joined); err == nil && j.After(from) {
 		from = j
 	}
-	all, err := a.slots(c, s.Group.ID)
+	all, err := a.slots(ctx, s.Group.ID)
 	if err != nil {
-		serverErr(c, err)
-		return
+		return nil, err
 	}
 
 	key := func(slotID int64, d string) string { return strconv.FormatInt(slotID, 10) + d }
@@ -104,30 +101,27 @@ func (a *app) myCorrectableLessons(c *gin.Context) {
 			JOIN schedule_slots ss ON ss.id = lc.slot_id WHERE ss.group_id=$1 AND lc.lesson_date >= $2::date`,
 			[]any{s.Group.ID, from}, func(id int64, d, _ string) { cancelled[key(id, d)] = true }},
 		{`SELECT slot_id, to_char(lesson_date,'YYYY-MM-DD'), status FROM attendance WHERE user_id=$1 AND lesson_date >= $2::date`,
-			[]any{s.UserID, from}, func(id int64, d, v string) { marks[key(id, d)] = v }},
+			[]any{userID, from}, func(id int64, d, v string) { marks[key(id, d)] = v }},
 		{`SELECT DISTINCT slot_id, to_char(lesson_date,'YYYY-MM-DD'), '' FROM attendance_corrections WHERE user_id=$1 AND lesson_date >= $2::date`,
-			[]any{s.UserID, from}, func(id int64, d, _ string) { corrected[key(id, d)] = true }},
+			[]any{userID, from}, func(id int64, d, _ string) { corrected[key(id, d)] = true }},
 	}
 	for _, qq := range queries {
-		rows, err := a.db.Query(c, qq.sql, qq.args...)
+		rows, err := a.db.Query(ctx, qq.sql, qq.args...)
 		if err != nil {
-			serverErr(c, err)
-			return
+			return nil, err
 		}
 		for rows.Next() {
 			var id int64
 			var d, v string
 			if err := rows.Scan(&id, &d, &v); err != nil {
 				rows.Close()
-				serverErr(c, err)
-				return
+				return nil, err
 			}
 			qq.into(id, d, v)
 		}
 		rows.Close()
 		if err := rows.Err(); err != nil {
-			serverErr(c, err)
-			return
+			return nil, err
 		}
 	}
 
@@ -153,6 +147,16 @@ func (a *app) myCorrectableLessons(c *gin.Context) {
 		}
 		sort.Slice(day, func(i, j int) bool { return day[i].StartTime > day[j].StartTime })
 		out = append(out, day...)
+	}
+	return out, nil
+}
+
+func (a *app) myCorrectableLessons(c *gin.Context) {
+	s := sess(c)
+	out, err := a.memberLessons(c, s, s.UserID)
+	if err != nil {
+		serverErr(c, err)
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{"corrections_open": s.Group.CorrectionsOpen, "lessons": out})
 }

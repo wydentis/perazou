@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, hasCredentials } from './api';
 import type { Me } from './types';
 import { ensureWriteAccess, haptic, inviteCodeFromLaunch } from './telegram';
@@ -10,6 +10,7 @@ import Schedule from './screens/Schedule';
 import StatsScreen from './screens/Stats';
 import GroupScreen from './screens/GroupScreen';
 import AdminScreen from './screens/Admin';
+import MemberScreen, { OpenMemberContext } from './screens/Member';
 
 type Tab = 'today' | 'schedule' | 'stats' | 'group' | 'admin';
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
@@ -25,11 +26,27 @@ export default function App() {
   const [error, setError] = useState('');
   const [tab, setTab] = useState<Tab>('today');
   const [adminOutsideGroup, setAdminOutsideGroup] = useState(false);
+  // A member's attendance page, opened on top of the current tab (which stays mounted).
+  const [memberId, setMemberId] = useState<number | null>(null);
+  const [scrollY, setScrollY] = useState(0);
+  const [memberVersion, setMemberVersion] = useState(0);
+  const openMember = useCallback((id: number) => {
+    haptic.tap();
+    setScrollY(window.scrollY);
+    setMemberId(id);
+    window.scrollTo(0, 0);
+  }, []);
+  const closeMember = useCallback(() => {
+    setMemberId(null);
+    requestAnimationFrame(() => window.scrollTo(0, scrollY));
+  }, [scrollY]);
   const toast = useToast();
 
   const reload = useCallback(() => {
     api.me().then(setMe, (e) => setError(humanError(e)));
   }, []);
+  const memberCtx = useMemo(() => ({ open: openMember, version: memberVersion }), [openMember, memberVersion]);
+  const memberChanged = useCallback(() => { setMemberVersion((v) => v + 1); reload(); }, [reload]);
   useEffect(() => {
     if (!hasCredentials()) {
       setError('Откройте приложение из Telegram');
@@ -56,25 +73,30 @@ export default function App() {
 
   const isHeadman = me.member.role === 'headman';
   return (
+    <OpenMemberContext.Provider value={memberCtx}>
     <div className="app">
       <main key={tab} className="screen">
-        {tab === 'today' && <Today me={me} onChanged={reload} />}
-        {tab === 'schedule' && <Schedule group={me.group} isHeadman={isHeadman} />}
-        {tab === 'stats' && <StatsScreen me={me} />}
-        {tab === 'group' && <GroupScreen me={me} onChanged={reload} />}
-        {tab === 'admin' && me.is_admin && <AdminScreen />}
+        <div hidden={memberId !== null}>
+          {tab === 'today' && <Today me={me} onChanged={reload} />}
+          {tab === 'schedule' && <Schedule group={me.group} isHeadman={isHeadman} />}
+          {tab === 'stats' && <StatsScreen me={me} />}
+          {tab === 'group' && <GroupScreen me={me} onChanged={reload} />}
+          {tab === 'admin' && me.is_admin && <AdminScreen />}
+        </div>
+        {memberId !== null && <div className="screen"><MemberScreen key={memberId} me={me} userId={memberId} onBack={closeMember} onChanged={memberChanged} /></div>}
         <Footer />
       </main>
       <nav className="tabbar">
         {tabs.map((t) => (
           <button key={t.id} className={tab === t.id ? 'active' : ''}
-            onClick={() => { if (t.id !== tab) haptic.select(); setTab(t.id); }}>
+            onClick={() => { if (t.id !== tab) haptic.select(); setMemberId(null); setTab(t.id); }}>
             <Icon name={t.icon} size={22} />
             <span>{t.label}</span>
           </button>
         ))}
       </nav>
     </div>
+    </OpenMemberContext.Provider>
   );
 }
 

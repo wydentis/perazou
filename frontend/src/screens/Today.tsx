@@ -6,6 +6,7 @@ import { canMarkWithThisSession, haptic } from '../telegram';
 import { Icon } from '../icons';
 import { Avatar, Empty, Skeleton, humanError, useToast } from '../ui';
 import CorrectionsScreen from './Corrections';
+import { useMemberDataVersion, useOpenMember } from './Member';
 
 export default function Today({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const group = me.group!;
@@ -17,11 +18,14 @@ export default function Today({ me, onChanged }: { me: Me; onChanged: () => void
   const [slots, setSlots] = useState<Slot[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [correcting, setCorrecting] = useState(false);
+  const blocked = !isHeadman && me.member!.self_mark_blocked;
+  const memberVersion = useMemberDataVersion();
 
   useEffect(() => { api.schedule().then(setSlots, () => {}); }, []);
   const load = useCallback(() => {
     api.lessons(date).then(setLessons, (e) => toast(humanError(e)));
-  }, [date, toast]);
+    // memberVersion: marks changed on a member page opened from here.
+  }, [date, toast, memberVersion]);
   useEffect(() => {
     setLessons(null);
     setExpanded(null);
@@ -107,7 +111,14 @@ export default function Today({ me, onChanged }: { me: Me; onChanged: () => void
         </div>
       )}
 
-      {(isHeadman || group.corrections_open) && (
+      {blocked && (
+        <div className="corr-banner">
+          <Icon name="ban" size={18} />
+          <span>Вас отмечает староста — отмечаться самостоятельно нельзя.</span>
+        </div>
+      )}
+
+      {(isHeadman || (group.corrections_open && !blocked)) && (
         <button className={'corr-entry' + (group.corrections_open ? ' on' : '')} onClick={() => { haptic.tap(); setCorrecting(true); }}>
           <Icon name="edit" size={18} />
           <span className="grow">
@@ -159,15 +170,15 @@ export default function Today({ me, onChanged }: { me: Me; onChanged: () => void
 
                 {!l.cancelled && (
                   <>
-                    <div className="mark">
+                    {!blocked && <div className="mark">
                       <button className={'mark-btn yes' + (l.my_status === 'present' ? ' on' : '')} disabled={!l.open} onClick={() => mark(l, 'present')}>
                         <Icon name="check" size={18} /> Был
                       </button>
                       <button className={'mark-btn no' + (l.my_status === 'absent' ? ' on' : '')} disabled={!l.open} onClick={() => mark(l, 'absent')}>
                         <Icon name="x" size={18} /> Не был
                       </button>
-                    </div>
-                    <MarkHint l={l} today={date === today} isHeadman={isHeadman} />
+                    </div>}
+                    {blocked ? <MyStatus l={l} /> : <MarkHint l={l} today={date === today} isHeadman={isHeadman} />}
                     <div className="split-bar"><i className="p" style={{ width: pPct + '%' }} /><i className="a" style={{ width: aPct + '%' }} /></div>
                     <div className="meta">
                       <span className="c-ok">{l.present} {plural(l.present, 'был', 'были', 'были')}</span>
@@ -209,6 +220,14 @@ function LessonBadge({ l, live }: { l: Lesson; live: boolean }) {
   return <span className="badge muted">Закрыта</span>;
 }
 
+/** For students only the headman marks: what the headman has put down, read-only. */
+function MyStatus({ l }: { l: Lesson }) {
+  const text = l.my_status === 'present' ? 'Староста отметил: был'
+    : l.my_status === 'absent' ? (l.my_auto ? 'Не отмечен — автоматически «не был»' : 'Староста отметил: не был')
+    : 'Отмечает староста';
+  return <div className="mark-hint"><Icon name="user" size={14} /> {text}</div>;
+}
+
 function MarkHint({ l, today, isHeadman }: { l: Lesson; today: boolean; isHeadman: boolean }) {
   let text: string;
   if (l.open) text = `Отметиться можно до ${l.closes_at}`;
@@ -221,10 +240,12 @@ function MarkHint({ l, today, isHeadman }: { l: Lesson; today: boolean; isHeadma
 
 function Roster({ lesson, onChange }: { lesson: Lesson; onChange: () => void }) {
   const toast = useToast();
+  const openMember = useOpenMember();
+  const memberVersion = useMemberDataVersion();
   const [rows, setRows] = useState<AttendanceRow[] | null>(null);
   const load = useCallback(() => {
     api.lessonAttendance(lesson.id, lesson.date).then(setRows, (e) => toast(humanError(e)));
-  }, [lesson.id, lesson.date, toast]);
+  }, [lesson.id, lesson.date, toast, memberVersion]);
   useEffect(load, [load]);
 
   async function set(r: AttendanceRow, status: 'present' | 'absent') {
@@ -255,8 +276,10 @@ function Roster({ lesson, onChange }: { lesson: Lesson; onChange: () => void }) 
     <div className="roster">
       {rows.map((r) => (
         <div key={r.user_id} className="roster-row">
+          <button className="person grow" onClick={() => openMember(r.user_id)}>
           <Avatar name={r.full_name} id={r.user_id} size={34} />
           <span className="grow">{r.full_name}{r.auto && <span className="auto-tag">авто</span>}{r.corrected && <span className="auto-tag">испр.</span>}</span>
+          </button>
           <button className={'round yes' + (r.status === 'present' ? ' on' : '')} onClick={() => set(r, 'present')} aria-label="Был"><Icon name="check" size={16} /></button>
           <button className={'round no' + (r.status === 'absent' ? ' on' : '')} onClick={() => set(r, 'absent')} aria-label="Не был"><Icon name="x" size={16} /></button>
         </div>

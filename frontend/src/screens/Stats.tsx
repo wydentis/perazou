@@ -3,7 +3,9 @@ import { api } from '../api';
 import type { Me, Stats } from '../types';
 import { addDays, plural, todayIn } from '../util';
 import { haptic } from '../telegram';
+import { Icon } from '../icons';
 import { Avatar, Empty, Ring, Skeleton, humanError, useToast } from '../ui';
+import { useMemberDataVersion, useOpenMember } from './Member';
 
 const RANGES = [{ label: 'Неделя', days: 6 }, { label: 'Месяц', days: 29 }, { label: '3 месяца', days: 89 }];
 
@@ -13,12 +15,14 @@ export default function StatsScreen({ me }: { me: Me }) {
   const toast = useToast();
   const [days, setDays] = useState(29);
   const [stats, setStats] = useState<Stats | null>(null);
+  const openMember = useOpenMember();
+  const memberVersion = useMemberDataVersion();
 
   useEffect(() => {
     const to = todayIn(group.timezone);
     setStats(null);
     api.stats(addDays(to, -days), to).then(setStats, (e) => toast(humanError(e)));
-  }, [days, group.timezone, toast]);
+  }, [days, group.timezone, toast, memberVersion]);
 
   const rows = stats?.rows ?? [];
   const mine = rows.find((r) => r.user_id === me.member!.user_id);
@@ -43,7 +47,7 @@ export default function StatsScreen({ me }: { me: Me }) {
 
       {!stats && <Skeleton h={180} />}
       {stats && (
-        <div className="hero-card">
+        <div className={'hero-card' + (isHeadman ? '' : ' tappable')} onClick={isHeadman ? undefined : () => openMember(me.member!.user_id)}>
           <Ring value={heroPct} size={112} stroke={10}>
             <b>{Math.round(heroPct * 100)}%</b>
           </Ring>
@@ -55,6 +59,7 @@ export default function StatsScreen({ me }: { me: Me }) {
                 <span>✓ {mine.present}</span><span>✕ {mine.absent}</span><span>? {mine.unmarked}</span>
               </div>
             )}
+            {!isHeadman && <div className="hero-more">Все мои пары <Icon name="right" size={14} /></div>}
             {isHeadman && <div className="hero-chips"><span>{rows.length} {plural(rows.length, 'студент', 'студента', 'студентов')}</span></div>}
           </div>
         </div>
@@ -69,7 +74,7 @@ export default function StatsScreen({ me }: { me: Me }) {
             {sorted.map((r) => {
               const pct = r.total ? r.present / r.total : 0;
               return (
-                <div key={r.user_id} className="list-row">
+                <button key={r.user_id} className="list-row tappable" onClick={() => openMember(r.user_id)}>
                   <Avatar name={r.full_name} id={r.user_id} />
                   <div className="grow">
                     <div className="row-title">{r.full_name}</div>
@@ -78,7 +83,7 @@ export default function StatsScreen({ me }: { me: Me }) {
                     </div>
                   </div>
                   <Ring value={pct} size={44} stroke={5}><small>{Math.round(pct * 100)}</small></Ring>
-                </div>
+                </button>
               );
             })}
           </div>

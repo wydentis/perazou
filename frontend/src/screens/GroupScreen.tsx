@@ -6,6 +6,7 @@ import { Icon } from '../icons';
 import { Avatar, Skeleton, humanError, useToast } from '../ui';
 import { Field } from './Onboarding';
 import { plural } from '../util';
+import { useMemberDataVersion, useOpenMember } from './Member';
 
 export default function GroupScreen({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const isHeadman = me.member!.role === 'headman';
@@ -15,9 +16,12 @@ export default function GroupScreen({ me, onChanged }: { me: Me; onChanged: () =
   const [myName, setMyName] = useState(me.member!.full_name);
   // Headman renaming a student inline: whose row is open and the draft name.
   const [renaming, setRenaming] = useState<{ id: number; name: string } | null>(null);
+  const [picking, setPicking] = useState(false);
+  const openMember = useOpenMember();
+  const memberVersion = useMemberDataVersion();
   const load = useCallback(() => {
     api.group().then(setD, (e) => toast(humanError(e)));
-  }, [toast]);
+  }, [toast, memberVersion]);
   useEffect(load, [load]);
 
   const run = (fn: () => Promise<unknown>, okText?: string, after?: () => void) => async () => {
@@ -98,14 +102,20 @@ export default function GroupScreen({ me, onChanged }: { me: Me; onChanged: () =
               </form>
             ) : (
               <div key={m.user_id} className="list-row">
+                <button className="person grow" disabled={!isHeadman && m.user_id !== me.member!.user_id}
+                  onClick={() => openMember(m.user_id)}>
                 <Avatar name={m.full_name} id={m.user_id} />
                 <div className="grow">
                   <div className="row-title">
                     {m.full_name}
                     {m.user_id === me.member!.user_id && <span className="you">вы</span>}
                   </div>
-                  <div className="meta">{m.role === 'headman' ? <><Icon name="crown" size={13} /> староста</> : m.username ? '@' + m.username : 'студент'}</div>
+                  <div className="meta">
+                    {m.role === 'headman' ? <><Icon name="crown" size={13} /> староста</> : m.username ? '@' + m.username : 'студент'}
+                    {m.self_mark_blocked && <span className="auto-tag">отмечает староста</span>}
+                  </div>
                 </div>
+                </button>
                 {isHeadman && m.user_id !== me.member!.user_id && (
                   <button className="icon-btn ghost" aria-label="Переименовать"
                     onClick={() => setRenaming({ id: m.user_id, name: m.full_name })}><Icon name="edit" size={17} /></button>
@@ -120,6 +130,42 @@ export default function GroupScreen({ me, onChanged }: { me: Me; onChanged: () =
           </div>
         )}
       </section>
+
+
+      {isHeadman && d && (
+        <section>
+          <h3 className="section-title">Отмечает только староста</h3>
+          <div className="card list">
+            {d.members.filter((m) => m.self_mark_blocked).map((m) => (
+              <div key={m.user_id} className="list-row">
+                <button className="person grow" onClick={() => openMember(m.user_id)}>
+                  <Avatar name={m.full_name} id={m.user_id} />
+                  <div className="grow row-title">{m.full_name}</div>
+                </button>
+                <button className="icon-btn ghost" aria-label="Убрать из списка"
+                  onClick={run(() => api.setSelfMarkBlocked(m.user_id, false), 'Снова отмечается сам')}><Icon name="x" size={18} /></button>
+              </div>
+            ))}
+            {picking && d.members.filter((m) => m.role !== 'headman' && !m.self_mark_blocked).map((m) => (
+              <button key={m.user_id} className="list-row tappable pick-row"
+                onClick={run(() => api.setSelfMarkBlocked(m.user_id, true), 'Добавлен в список')}>
+                <Avatar name={m.full_name} id={m.user_id} />
+                <div className="grow row-title">{m.full_name}</div>
+                <Icon name="plus" size={18} />
+              </button>
+            ))}
+            {!picking && d.members.every((m) => !m.self_mark_blocked) && (
+              <div className="list-row"><p className="hint">Список пуст — все отмечаются сами.</p></div>
+            )}
+          </div>
+          {d.members.some((m) => m.role !== 'headman' && !m.self_mark_blocked) && (
+            <button className="btn ghost sm" onClick={() => { haptic.select(); setPicking(!picking); }}>
+              <Icon name={picking ? 'check' : 'plus'} size={16} /> {picking ? 'Готово' : 'Добавить'}
+            </button>
+          )}
+          <p className="hint">Эти студенты не могут отмечаться сами — ни в приложении, ни кнопками в боте; напоминания им не приходят. Отмечайте их в «Списке» пары.</p>
+        </section>
+      )}
 
       <section>
         <h3 className="section-title">Профиль</h3>

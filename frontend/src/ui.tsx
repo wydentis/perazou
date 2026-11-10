@@ -83,6 +83,7 @@ export function humanError(e: unknown): string {
     'invite not found': 'Приглашение не найдено',
     'already in a group': 'Вы уже состоите в группе',
     'headman only': 'Доступно только старосте',
+    'self marking disabled': 'Вас отмечает староста',
     'headman cannot leave the group': 'Староста не может выйти из группы',
     'invalid slot': 'Проверьте поля пары',
     'admin only': 'Доступно только администратору',

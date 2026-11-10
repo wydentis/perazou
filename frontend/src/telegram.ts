@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 // Minimal typings for the parts of Telegram.WebApp we use.
 interface TgWebApp {
   initData: string;
@@ -12,6 +13,7 @@ interface TgWebApp {
   setBackgroundColor?(color: string): void;
   setBottomBarColor?(color: string): void;
   onEvent?(event: 'themeChanged', cb: () => void): void;
+  BackButton?: { show(): void; hide(): void; onClick(cb: () => void): void; offClick(cb: () => void): void };
   HapticFeedback?: {
     impactOccurred(style: 'light' | 'medium'): void;
     notificationOccurred(type: 'success' | 'error'): void;
@@ -29,6 +31,17 @@ function applyTheme() {
   tg?.setHeaderColor?.(bg);
   tg?.setBackgroundColor?.(bg);
   tg?.setBottomBarColor?.(bg);
+}
+
+/** Shows Telegram's own back button while a sub-screen is open; returns the cleanup. */
+export function useTelegramBack(onBack: () => void) {
+  useEffect(() => {
+    const b = tg?.BackButton;
+    if (!b) return;
+    b.onClick(onBack);
+    b.show();
+    return () => { b.offClick(onBack); b.hide(); };
+  }, [onBack]);
 }
 
 export function initTelegram() {
