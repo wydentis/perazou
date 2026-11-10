@@ -67,8 +67,9 @@ type correctableLesson struct {
 	Corrected bool   `json:"corrected"`
 }
 
-// myCorrectableLessons lists the caller's lessons that have already started, newest first,
-// from the day they joined (at most 180 days back), with their current mark.
+// myCorrectableLessons lists all of the caller's lessons that have already started, newest
+// first, from the day they joined, with their current mark. Lessons before joining are left
+// out: they do not count towards the member's stats. A two-year bound keeps the loop finite.
 func (a *app) myCorrectableLessons(c *gin.Context) {
 	s := sess(c)
 	now := s.Group.now()
@@ -79,7 +80,7 @@ func (a *app) myCorrectableLessons(c *gin.Context) {
 		serverErr(c, err)
 		return
 	}
-	from := today.AddDate(0, 0, -180)
+	from := today.AddDate(-2, 0, 0)
 	if j, err := parseDate(joined); err == nil && j.After(from) {
 		from = j
 	}

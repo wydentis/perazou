@@ -4,7 +4,7 @@ import type { CorrectableLesson, CorrectionEntry, Me } from '../types';
 import { Icon } from '../icons';
 import { Empty, Skeleton, humanError, useToast } from '../ui';
 import { haptic } from '../telegram';
-import { humanDate, shortDate } from '../util';
+import { addDays, humanDate, mondayOf, parseDate, plural, shortDate } from '../util';
 
 const STATUS: Record<string, string> = { present: 'был', absent: 'не был', auto: 'н (авто)' };
 
@@ -15,6 +15,8 @@ export default function CorrectionsScreen({ me, onBack, onChanged }: { me: Me; o
   const [lessons, setLessons] = useState<CorrectableLesson[] | null>(null);
   const [log, setLog] = useState<CorrectionEntry[] | null>(null);
   const [view, setView] = useState<'mine' | 'log'>('mine');
+  // Weeks the user opened or closed; by default the two most recent are open.
+  const [toggled, setToggled] = useState<Set<string>>(new Set());
 
   const load = useCallback(() => {
     api.myCorrectableLessons().then((r) => { setLessons(r.lessons); setOpen(r.corrections_open); }, (e) => toast(humanError(e)));
@@ -48,7 +50,31 @@ export default function CorrectionsScreen({ me, onBack, onChanged }: { me: Me; o
   }
 
   const canEdit = isHeadman || open;
-  const days = lessons ? [...new Set(lessons.map((l) => l.date))] : [];
+  // Lessons arrive newest first; group them into weeks (Mon–Sun), then days.
+  const weeks: { monday: string; days: { date: string; items: CorrectableLesson[] }[]; absent: number; total: number }[] = [];
+  for (const l of lessons ?? []) {
+    const monday = mondayOf(l.date);
+    let w = weeks[weeks.length - 1];
+    if (!w || w.monday !== monday) weeks.push((w = { monday, days: [], absent: 0, total: 0 }));
+    let d = w.days[w.days.length - 1];
+    if (!d || d.date !== l.date) w.days.push((d = { date: l.date, items: [] }));
+    d.items.push(l);
+    w.total++;
+    if (l.status === 'absent') w.absent++;
+  }
+  const isOpen = (i: number, monday: string) => (i < 2) !== toggled.has(monday);
+  const flip = (monday: string) => setToggled((s) => {
+    const n = new Set(s);
+    if (n.has(monday)) n.delete(monday);
+    else n.add(monday);
+    return n;
+  });
+  const weekLabel = (monday: string) => {
+    const a = parseDate(monday), b = parseDate(addDays(monday, 6));
+    // Day + month together gives the genitive ("9 ноября"); month alone would be "ноябрь".
+    const dm = (x: Date) => x.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+    return a.getMonth() === b.getMonth() ? `${a.getDate()}–${dm(b)}` : `${dm(a)} – ${dm(b)}`;
+  };
 
   return (
     <div className="page">
@@ -86,11 +112,20 @@ export default function CorrectionsScreen({ me, onBack, onChanged }: { me: Me; o
       )}
 
       {view === 'mine' && (
-        lessons === null ? <Skeleton h={160} /> : lessons.length === 0 ? <Empty title="Прошедших пар нет" /> : days.map((d) => (
-          <section key={d} className="day-section">
+        lessons === null ? <Skeleton h={160} /> : lessons.length === 0 ? <Empty title="Прошедших пар нет" /> : weeks.map((w, i) => (
+          <section key={w.monday} className="week">
+            <button className={'week-head' + (isOpen(i, w.monday) ? ' open' : '')} onClick={() => { haptic.select(); flip(w.monday); }}>
+              <span className="grow">
+                <b>{weekLabel(w.monday)}</b>
+                <small>{w.total} {plural(w.total, 'пара', 'пары', 'пар')}{w.absent > 0 && <> · <span className="c-bad">{w.absent} н</span></>}</small>
+              </span>
+              <Icon name="right" size={16} className="week-chev" />
+            </button>
+            {isOpen(i, w.monday) && w.days.map(({ date: d, items }) => (
+          <div key={d} className="day-section">
             <h3 className="section-title">{humanDate(d)}</h3>
             <div className="card list">
-              {lessons.filter((l) => l.date === d).map((l) => (
+              {items.map((l) => (
                 <div key={l.slot_id + l.date} className="list-row">
                   <div className="slot-time"><b>{l.start_time}</b><span>{l.end_time}</span></div>
                   <div className="grow">
@@ -107,6 +142,8 @@ export default function CorrectionsScreen({ me, onBack, onChanged }: { me: Me; o
                 </div>
               ))}
             </div>
+          </div>
+            ))}
           </section>
         ))
       )}
