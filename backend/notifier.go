@@ -70,7 +70,7 @@ func (a *app) notifyGroup(ctx context.Context, g groupRow) error {
 		claimed, err := a.db.Query(ctx, `
 			INSERT INTO lesson_notifications (slot_id, lesson_date, user_id)
 			SELECT $1, $2::date, m.user_id FROM members m
-			WHERE m.group_id = $3 AND (m.joined_at AT TIME ZONE $4)::date <= $2::date
+			WHERE m.group_id = $3 AND NOT m.self_mark_blocked AND (m.joined_at AT TIME ZONE $4)::date <= $2::date
 				AND NOT EXISTS (SELECT 1 FROM lesson_cancellations c WHERE c.slot_id = $1 AND c.lesson_date = $2::date)
 				AND NOT EXISTS (SELECT 1 FROM attendance a WHERE a.slot_id = $1 AND a.lesson_date = $2::date AND a.user_id = m.user_id)
 			ON CONFLICT DO NOTHING

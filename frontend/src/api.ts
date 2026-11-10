@@ -1,5 +1,5 @@
 import { tg } from './telegram';
-import type { AdminGroup, AdminUser, AttendanceRow, CorrectableLesson, CorrectionEntry, GroupDetails, ImportGroup, Lesson, Me, Slot, Stats } from './types';
+import type { AdminGroup, AdminUser, AttendanceRow, CorrectableLesson, CorrectionEntry, GroupDetails, ImportGroup, Lesson, Me, Member, Slot, Stats } from './types';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -41,6 +41,8 @@ export const api = {
   leave: () => request<void>('POST', '/group/leave'),
   rename: (id: number, full_name: string) => request<void>('PATCH', `/members/${id}`, { full_name }),
   removeMember: (id: number) => request<void>('DELETE', `/members/${id}`),
+  memberAttendance: (id: number) => request<{ member: Member; lessons: CorrectableLesson[] }>('GET', `/members/${id}/attendance`),
+  setSelfMarkBlocked: (id: number, blocked: boolean) => request<void>('PUT', `/members/${id}/self-mark`, { blocked }),
   schedule: () => request<Slot[]>('GET', '/schedule'),
   saveSlot: (slot: Omit<Slot, 'id'>, id?: number) =>
     id ? request<Slot>('PUT', `/schedule/${id}`, slot) : request<Slot>('POST', '/schedule', slot),

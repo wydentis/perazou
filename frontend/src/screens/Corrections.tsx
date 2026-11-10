@@ -4,19 +4,20 @@ import type { CorrectableLesson, CorrectionEntry, Me } from '../types';
 import { Icon } from '../icons';
 import { Empty, Skeleton, humanError, useToast } from '../ui';
 import { haptic } from '../telegram';
-import { addDays, humanDate, mondayOf, parseDate, plural, shortDate } from '../util';
+import { shortDate } from '../util';
+import { LessonWeeks } from './LessonWeeks';
+import { useOpenMember } from './Member';
 
 const STATUS: Record<string, string> = { present: 'был', absent: 'не был', auto: 'н (авто)' };
 
 export default function CorrectionsScreen({ me, onBack, onChanged }: { me: Me; onBack: () => void; onChanged: () => void }) {
   const isHeadman = me.member!.role === 'headman';
   const toast = useToast();
+  const openMember = useOpenMember();
   const [open, setOpen] = useState(me.group!.corrections_open);
   const [lessons, setLessons] = useState<CorrectableLesson[] | null>(null);
   const [log, setLog] = useState<CorrectionEntry[] | null>(null);
   const [view, setView] = useState<'mine' | 'log'>('mine');
-  // Weeks the user opened or closed; by default the two most recent are open.
-  const [toggled, setToggled] = useState<Set<string>>(new Set());
 
   const load = useCallback(() => {
     api.myCorrectableLessons().then((r) => { setLessons(r.lessons); setOpen(r.corrections_open); }, (e) => toast(humanError(e)));
@@ -49,32 +50,7 @@ export default function CorrectionsScreen({ me, onBack, onChanged }: { me: Me; o
     }
   }
 
-  const canEdit = isHeadman || open;
-  // Lessons arrive newest first; group them into weeks (Mon–Sun), then days.
-  const weeks: { monday: string; days: { date: string; items: CorrectableLesson[] }[]; absent: number; total: number }[] = [];
-  for (const l of lessons ?? []) {
-    const monday = mondayOf(l.date);
-    let w = weeks[weeks.length - 1];
-    if (!w || w.monday !== monday) weeks.push((w = { monday, days: [], absent: 0, total: 0 }));
-    let d = w.days[w.days.length - 1];
-    if (!d || d.date !== l.date) w.days.push((d = { date: l.date, items: [] }));
-    d.items.push(l);
-    w.total++;
-    if (l.status === 'absent') w.absent++;
-  }
-  const isOpen = (i: number, monday: string) => (i < 2) !== toggled.has(monday);
-  const flip = (monday: string) => setToggled((s) => {
-    const n = new Set(s);
-    if (n.has(monday)) n.delete(monday);
-    else n.add(monday);
-    return n;
-  });
-  const weekLabel = (monday: string) => {
-    const a = parseDate(monday), b = parseDate(addDays(monday, 6));
-    // Day + month together gives the genitive ("9 ноября"); month alone would be "ноябрь".
-    const dm = (x: Date) => x.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-    return a.getMonth() === b.getMonth() ? `${a.getDate()}–${dm(b)}` : `${dm(a)} – ${dm(b)}`;
-  };
+  const canEdit = (isHeadman || open) && !me.member!.self_mark_blocked;
 
   return (
     <div className="page">
@@ -95,6 +71,11 @@ export default function CorrectionsScreen({ me, onBack, onChanged }: { me: Me; o
           </div>
           <p className="hint">Пока включено, каждый может поменять «был / не был» за прошедшие пары. Все изменения видны в журнале.</p>
         </div>
+      ) : me.member!.self_mark_blocked ? (
+        <div className="corr-banner">
+          <Icon name="ban" size={18} />
+          <span>Вас отмечает староста — исправить отметки может только он.</span>
+        </div>
       ) : (
         <div className={'corr-banner' + (open ? ' on' : '')}>
           <Icon name={open ? 'edit' : 'ban'} size={18} />
@@ -112,40 +93,9 @@ export default function CorrectionsScreen({ me, onBack, onChanged }: { me: Me; o
       )}
 
       {view === 'mine' && (
-        lessons === null ? <Skeleton h={160} /> : lessons.length === 0 ? <Empty title="Прошедших пар нет" /> : weeks.map((w, i) => (
-          <section key={w.monday} className="week">
-            <button className={'week-head' + (isOpen(i, w.monday) ? ' open' : '')} onClick={() => { haptic.select(); flip(w.monday); }}>
-              <span className="grow">
-                <b>{weekLabel(w.monday)}</b>
-                <small>{w.total} {plural(w.total, 'пара', 'пары', 'пар')}{w.absent > 0 && <> · <span className="c-bad">{w.absent} н</span></>}</small>
-              </span>
-              <Icon name="right" size={16} className="week-chev" />
-            </button>
-            {isOpen(i, w.monday) && w.days.map(({ date: d, items }) => (
-          <div key={d} className="day-section">
-            <h3 className="section-title">{humanDate(d)}</h3>
-            <div className="card list">
-              {items.map((l) => (
-                <div key={l.slot_id + l.date} className="list-row">
-                  <div className="slot-time"><b>{l.start_time}</b><span>{l.end_time}</span></div>
-                  <div className="grow">
-                    <div className="row-title">{l.subject}</div>
-                    <div className="meta">
-                      <span className={l.status === 'present' ? 'c-ok' : l.status === 'absent' ? 'c-bad' : ''}>
-                        {l.status === 'present' ? 'был' : l.status === 'absent' ? (l.auto ? 'н (не отметился)' : 'не был') : 'не отмечено'}
-                      </span>
-                      {l.corrected && <span className="auto-tag">испр.</span>}
-                    </div>
-                  </div>
-                  <button className={'round yes' + (l.status === 'present' ? ' on' : '')} disabled={!canEdit} onClick={() => mark(l, 'present')} aria-label="Был"><Icon name="check" size={16} /></button>
-                  <button className={'round no' + (l.status === 'absent' && !l.auto ? ' on' : '')} disabled={!canEdit} onClick={() => mark(l, 'absent')} aria-label="Не был"><Icon name="x" size={16} /></button>
-                </div>
-              ))}
-            </div>
-          </div>
-            ))}
-          </section>
-        ))
+        lessons === null ? <Skeleton h={160} /> : lessons.length === 0 ? <Empty title="Прошедших пар нет" /> : (
+          <LessonWeeks lessons={lessons} canEdit={canEdit} onMark={mark} />
+        )
       )}
 
       {view === 'log' && isHeadman && (
@@ -154,7 +104,7 @@ export default function CorrectionsScreen({ me, onBack, onChanged }: { me: Me; o
             {log.map((e) => (
               <div key={e.id} className="list-row">
                 <div className="grow">
-                  <div className="row-title">{e.full_name}</div>
+                  <button className="row-title link" onClick={() => openMember(e.user_id)}>{e.full_name}</button>
                   <div className="meta wrap">
                     <span>{e.subject} · {shortDate(e.date)} {e.start_time}</span>
                     <span className="c-bad">{STATUS[e.old_status]}</span>

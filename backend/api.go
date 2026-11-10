@@ -38,6 +38,8 @@ type memberInfo struct {
 	FullName string `json:"full_name"`
 	Role     string `json:"role"`
 	Username string `json:"username,omitempty"`
+	// SelfMarkBlocked: only the headman marks this member.
+	SelfMarkBlocked bool `json:"self_mark_blocked"`
 }
 
 const (
@@ -51,6 +53,8 @@ type session struct {
 	FullName string
 	Role     string
 	Group    groupRow
+	// SelfMarkBlocked: the headman put this member on the list of those only they can mark.
+	SelfMarkBlocked bool
 }
 
 type groupRow struct {
@@ -109,6 +113,8 @@ func newRouter(a *app) *gin.Engine {
 	m.POST("/group/leave", a.leaveGroup)
 	m.PATCH("/members/:id", a.renameMember)
 	m.DELETE("/members/:id", headmanOnly, a.removeMember)
+	m.GET("/members/:id/attendance", a.memberAttendance)
+	m.PUT("/members/:id/self-mark", headmanOnly, a.setSelfMarkBlocked)
 
 	m.GET("/schedule", a.listSlots)
 	m.POST("/schedule", headmanOnly, a.createSlot)
@@ -175,9 +181,9 @@ func (a *app) authMiddleware(c *gin.Context) {
 func (a *app) loadSession(ctx context.Context, userID int64) (*session, error) {
 	s := &session{UserID: userID}
 	err := a.db.QueryRow(ctx, `
-		SELECT m.full_name, m.role, g.id, g.name, g.invite_code, g.timezone, g.corrections_open
+		SELECT m.full_name, m.role, m.self_mark_blocked, g.id, g.name, g.invite_code, g.timezone, g.corrections_open
 		FROM members m JOIN groups g ON g.id = m.group_id WHERE m.user_id = $1`, userID).
-		Scan(&s.FullName, &s.Role, &s.Group.ID, &s.Group.Name, &s.Group.Code, &s.Group.Timezone, &s.Group.CorrectionsOpen)
+		Scan(&s.FullName, &s.Role, &s.SelfMarkBlocked, &s.Group.ID, &s.Group.Name, &s.Group.Code, &s.Group.Timezone, &s.Group.CorrectionsOpen)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -252,7 +258,7 @@ func (a *app) getMe(c *gin.Context) {
 	}
 	out := gin.H{"user": u, "member": nil, "group": nil, "is_admin": a.cfg.isAdmin(u)}
 	if s != nil {
-		out["member"] = memberInfo{UserID: s.UserID, FullName: s.FullName, Role: s.Role}
+		out["member"] = memberInfo{UserID: s.UserID, FullName: s.FullName, Role: s.Role, SelfMarkBlocked: s.SelfMarkBlocked}
 		out["group"] = s.Group.info()
 	}
 	c.JSON(http.StatusOK, out)
@@ -376,7 +382,7 @@ func (a *app) joinGroup(c *gin.Context) {
 func (a *app) getGroup(c *gin.Context) {
 	s := sess(c)
 	rows, err := a.db.Query(c, `
-		SELECT m.user_id, m.full_name, m.role, u.username
+		SELECT m.user_id, m.full_name, m.role, u.username, m.self_mark_blocked
 		FROM members m JOIN users u ON u.id = m.user_id
 		WHERE m.group_id = $1 ORDER BY (m.role = 'headman') DESC, m.full_name`, s.Group.ID)
 	if err != nil {
@@ -387,7 +393,7 @@ func (a *app) getGroup(c *gin.Context) {
 	members := []memberInfo{}
 	for rows.Next() {
 		var m memberInfo
-		if err := rows.Scan(&m.UserID, &m.FullName, &m.Role, &m.Username); err != nil {
+		if err := rows.Scan(&m.UserID, &m.FullName, &m.Role, &m.Username, &m.SelfMarkBlocked); err != nil {
 			serverErr(c, err)
 			return
 		}

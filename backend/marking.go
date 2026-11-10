@@ -38,10 +38,14 @@ func (a *app) loadLesson(ctx context.Context, s *session, slotID int64, dateStr 
 // mark only themselves and only while the window is open; the headman may mark anyone in
 // the group once the lesson has started or its window is open. While the headman keeps
 // correction mode on, students may also change their own mark on a past lesson; each such
-// change is logged in attendance_corrections.
+// change is logged in attendance_corrections. Students on the headman's "only I mark them"
+// list cannot mark themselves at all.
 func (a *app) applyMark(ctx context.Context, s *session, target, slotID int64, dateStr, status string) (slot, error) {
 	if target != s.UserID && s.Role != "headman" {
 		return slot{}, refuse(http.StatusForbidden, "headman only")
+	}
+	if s.Role != "headman" && s.SelfMarkBlocked {
+		return slot{}, refuse(http.StatusForbidden, "self marking disabled")
 	}
 	sl, date, err := a.loadLesson(ctx, s, slotID, dateStr)
 	if err != nil {

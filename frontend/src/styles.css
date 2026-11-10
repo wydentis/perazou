@@ -413,3 +413,16 @@ section > .card + .btn, .page > .card + .btn { margin-top: 4px; }
 .week-head small { display: block; margin-top: 2px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .week-chev { color: var(--muted); transition: transform .2s; }
 .week-head.open .week-chev { transform: rotate(90deg); }
+
+/* Member pages: anything with a person on it opens their attendance. */
+button.person { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+button.person:disabled { cursor: default; opacity: 1; }
+button.person:not(:disabled):active { opacity: .6; }
+button.list-row.tappable, button.subject-row { width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+button.list-row.tappable:active, button.subject-row:active, .hero-card.tappable:active { opacity: .7; }
+.hero-card.tappable { cursor: pointer; }
+.hero-more { margin-top: 8px; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; opacity: .75; }
+.subject-row.active { background: var(--surface-2); }
+button.row-title.link { padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.chip.sm { height: 24px; padding: 0 10px; font-size: 12px; margin-left: 6px; vertical-align: middle; }
+.meta .auto-tag { white-space: nowrap; }

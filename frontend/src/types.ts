@@ -9,6 +9,8 @@ export interface Member {
   full_name: string;
   role: 'headman' | 'student';
   username?: string;
+  /** Only the headman marks this member. */
+  self_mark_blocked: boolean;
 }
 export interface Me {
   user: { id: number; first_name: string };

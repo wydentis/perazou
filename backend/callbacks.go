@@ -60,6 +60,8 @@ func callbackRefusal(msg string) string {
 		return "Отметка ещё не открылась"
 	case "lesson is cancelled":
 		return "Пара отменена"
+	case "self marking disabled":
+		return "Вас отмечает староста"
 	case "lesson not found":
 		return "Пары больше нет в расписании"
 	}
