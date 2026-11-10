@@ -1,7 +1,7 @@
 // Minimal typings for the parts of Telegram.WebApp we use.
 interface TgWebApp {
   initData: string;
-  initDataUnsafe: { start_param?: string; user?: { id: number; allows_write_to_pm?: boolean } };
+  initDataUnsafe: { start_param?: string; auth_date?: number; user?: { id: number; allows_write_to_pm?: boolean } };
   colorScheme?: 'light' | 'dark';
   ready(): void;
   expand(): void;
@@ -60,6 +60,15 @@ export function ensureWriteAccess(onGranted: () => void) {
     /* storage unavailable: ask anyway */
   }
   tg.requestWriteAccess((granted) => granted && onGranted());
+}
+
+/**
+ * Whether this launch can still mark attendance: the server accepts marks only within an
+ * hour of opening the Mini App (markSessionMaxAge), so a copied launch link goes stale.
+ */
+export function canMarkWithThisSession(): boolean {
+  const issued = tg?.initDataUnsafe?.auth_date;
+  return !issued || Date.now() / 1000 - issued < 55 * 60; // a little before the server's 60
 }
 
 export function confirmDialog(message: string): Promise<boolean> {

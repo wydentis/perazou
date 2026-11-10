@@ -396,6 +396,13 @@ func (a *app) markAttendance(c *gin.Context) {
 		fail(c, http.StatusBadRequest, "invalid status")
 		return
 	}
+	// Marks need initData from a recent launch of the Mini App. Viewing works with a day-old
+	// session, but a copied launch link handed to an auto-marking bot stops working here
+	// within the hour, while a person opening the app to mark always has a fresh one.
+	if u := c.MustGet(keyUser).(*tgUser); time.Since(u.AuthDate) > markSessionMaxAge {
+		fail(c, http.StatusForbidden, "session too old to mark")
+		return
+	}
 	target := s.UserID
 	if req.UserID != nil {
 		target = *req.UserID

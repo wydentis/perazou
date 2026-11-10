@@ -24,7 +24,7 @@ func TestValidateInitData(t *testing.T) {
 	user := `{"id":42,"first_name":"Ann"}`
 
 	u, err := validateInitData(signed("tok", now, user), "tok", time.Hour, now)
-	if err != nil || u.ID != 42 {
+	if err != nil || u.ID != 42 || u.AuthDate.Unix() != now.Unix() {
 		t.Fatalf("valid data rejected: %v", err)
 	}
 	if _, err := validateInitData(signed("tok", now, user), "other", time.Hour, now); err == nil {
