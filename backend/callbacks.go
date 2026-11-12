@@ -32,10 +32,20 @@ func (a *app) markCallback(ctx context.Context, cq *callbackQuery) callbackReply
 	if s == nil {
 		return callbackReply{Answer: "Вы не состоите в группе"}
 	}
+	// The chat buttons belong to the reminder, so they work only inside the marking window,
+	// for everyone: the headman's and correction-mode edits of past lessons stay in the app.
+	if sl, d, err := a.loadLesson(ctx, s, slotID, date); err == nil {
+		if _, open := lessonState(s.Group.now(), d, sl.StartTime); !open {
+			return a.closedReply(ctx, sl, date, s.UserID)
+		}
+	}
 	sl, err := a.applyMark(ctx, s, s.UserID, slotID, date, status)
 	if err != nil {
 		var ue *userError
 		if errors.As(err, &ue) {
+			if ue.msg == "marking is closed for this lesson" {
+				return a.closedReply(ctx, sl, date, s.UserID)
+			}
 			return callbackReply{Answer: callbackRefusal(ue.msg)}
 		}
 		log.Println("callback:", err)
@@ -49,6 +59,21 @@ func (a *app) markCallback(ctx context.Context, cq *callbackQuery) callbackReply
 		Answer:   label,
 		Text:     reminderText(sl) + "\n\n" + label + " (можно изменить до " + markClosesAt(sl.StartTime) + ")",
 		Keyboard: a.reminderKeyboard(sl, date),
+	}
+}
+
+// closedReply answers a press after the window: a popup, and the message loses its buttons.
+func (a *app) closedReply(ctx context.Context, sl slot, date string, userID int64) callbackReply {
+	var status string
+	if err := a.db.QueryRow(ctx, `SELECT COALESCE((SELECT status FROM attendance WHERE slot_id=$1 AND lesson_date=$2::date AND user_id=$3), '')`,
+		sl.ID, date, userID).Scan(&status); err != nil {
+		log.Println("callback:", err)
+	}
+	return callbackReply{
+		Answer:   "⏰ Время отметки закончилось в " + markClosesAt(sl.StartTime),
+		Alert:    true,
+		Text:     closedText(sl, status),
+		Keyboard: a.appKeyboard(),
 	}
 }
 
