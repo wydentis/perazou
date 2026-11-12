@@ -61,6 +61,9 @@ func (a *app) notifyGroup(ctx context.Context, g groupRow) error {
 	if err != nil {
 		return err
 	}
+	if err := a.closeReminders(ctx, g, all, now, today); err != nil {
+		return err
+	}
 	for _, sl := range all {
 		if started, open := lessonState(now, today, sl.StartTime); !sl.occursOn(today) || !started || !open {
 			continue
@@ -92,15 +95,72 @@ func (a *app) notifyGroup(ctx context.Context, g groupRow) error {
 			return err
 		}
 		for _, uid := range users {
-			if err := a.bot.call(ctx, "sendMessage", a.reminder(uid, sl, dateStr), nil); err != nil {
+			var sent struct {
+				MessageID int64 `json:"message_id"`
+			}
+			if err := a.bot.call(ctx, "sendMessage", a.reminder(uid, sl, dateStr), &sent); err != nil {
 				if retryable(err) {
 					// Release the claim so the next tick tries again while the window is open.
 					a.db.Exec(ctx, `DELETE FROM lesson_notifications WHERE slot_id=$1 AND lesson_date=$2::date AND user_id=$3`, sl.ID, dateStr, uid)
 				}
 				log.Printf("notifier: user %d: %v", uid, err)
+			} else if _, err := a.db.Exec(ctx, `UPDATE lesson_notifications SET message_id=$4 WHERE slot_id=$1 AND lesson_date=$2::date AND user_id=$3`,
+				sl.ID, dateStr, uid, sent.MessageID); err != nil {
+				log.Printf("notifier: user %d: %v", uid, err)
 			}
 			// Stay well under Telegram's ~30 messages/second limit.
 			time.Sleep(50 * time.Millisecond)
+		}
+	}
+	return nil
+}
+
+// closeReminders edits reminders whose marking window has closed (today's, and yesterday's
+// in case the server was down at midnight): the buttons go and the result is shown. The
+// UPDATE … RETURNING claims each message, so replicas never edit the same one twice.
+func (a *app) closeReminders(ctx context.Context, g groupRow, all []slot, now, today time.Time) error {
+	for _, d := range []time.Time{today.AddDate(0, 0, -1), today} {
+		dateStr := d.Format(dateLayout)
+		for _, sl := range all {
+			if _, open := lessonState(now, d, sl.StartTime); open || !sl.occursOn(d) {
+				continue
+			}
+			rows, err := a.db.Query(ctx, `
+				UPDATE lesson_notifications n SET closed = true
+				WHERE n.slot_id=$1 AND n.lesson_date=$2::date AND NOT n.closed AND n.message_id IS NOT NULL
+				RETURNING n.user_id, n.message_id,
+					COALESCE((SELECT status FROM attendance a WHERE a.slot_id=n.slot_id AND a.lesson_date=n.lesson_date AND a.user_id=n.user_id), '')`,
+				sl.ID, dateStr)
+			if err != nil {
+				return err
+			}
+			type msg struct {
+				user, id int64
+				status   string
+			}
+			var msgs []msg
+			for rows.Next() {
+				var m msg
+				if err := rows.Scan(&m.user, &m.id, &m.status); err != nil {
+					rows.Close()
+					return err
+				}
+				msgs = append(msgs, m)
+			}
+			rows.Close()
+			if err := rows.Err(); err != nil {
+				return err
+			}
+			for _, m := range msgs {
+				err := a.bot.call(ctx, "editMessageText", map[string]any{
+					"chat_id": m.user, "message_id": m.id, "text": closedText(sl, m.status), "reply_markup": a.appKeyboard(),
+				}, nil)
+				// "not modified": already edited after a late press; "not found": the user deleted it.
+				if err != nil && !strings.Contains(err.Error(), "message is not modified") && !strings.Contains(err.Error(), "message to edit not found") {
+					log.Printf("notifier: close user %d: %v", m.user, err)
+				}
+				time.Sleep(50 * time.Millisecond)
+			}
 		}
 	}
 	return nil
@@ -120,6 +180,29 @@ func reminderText(sl slot) string {
 		text += ", ауд. " + sl.Room
 	}
 	return text + fmt.Sprintf(".\nОтметься до %s — потом будет автоматически «не был».", markClosesAt(sl.StartTime))
+}
+
+// closedText replaces a reminder once its marking window has closed.
+func closedText(sl slot, status string) string {
+	text := fmt.Sprintf("🔔 Пара «%s» в %s", sl.Subject, sl.StartTime)
+	if sl.Room != "" {
+		text += ", ауд. " + sl.Room
+	}
+	result := "не отметились — автоматически «не был»"
+	switch status {
+	case "present":
+		result = "✅ был"
+	case "absent":
+		result = "❌ не был"
+	}
+	return text + fmt.Sprintf(".\n\n⏰ Время отметки закончилось в %s. Итог: %s", markClosesAt(sl.StartTime), result)
+}
+
+// appKeyboard is what stays under a closed reminder: just the way into the app.
+func (a *app) appKeyboard() map[string]any {
+	return map[string]any{"inline_keyboard": [][]map[string]any{
+		{{"text": "Открыть приложение", "web_app": map[string]string{"url": a.cfg.WebAppURL}}},
+	}}
 }
 
 // reminderKeyboard lets people mark right from the chat; the app stays one tap away.

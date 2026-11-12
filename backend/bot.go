@@ -51,6 +51,7 @@ type callbackQuery struct {
 // and keyboard (Text == "" leaves the message as it is).
 type callbackReply struct {
 	Answer   string
+	Alert    bool // show Answer as a popup instead of a brief toast
 	Text     string
 	Keyboard any
 }
@@ -128,7 +129,11 @@ func (b *bot) handleCallback(ctx context.Context, cq *callbackQuery) map[string]
 			}
 		}()
 	}
-	return map[string]any{"callback_query_id": cq.ID, "text": r.Answer}
+	answer := map[string]any{"callback_query_id": cq.ID, "text": r.Answer}
+	if r.Alert {
+		answer["show_alert"] = true
+	}
+	return answer
 }
 
 // Bot profile texts, applied on every start so the code is the single source of truth.
